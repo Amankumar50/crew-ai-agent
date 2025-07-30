@@ -1,0 +1,141 @@
+# version: '3.9'
+
+# services:
+#   agents:
+#     build: .
+#     env_file:
+#       - .env
+#     command: poetry run python -m marketing_posts.crew
+#     secrets:
+#       - openai-api-key
+
+# secrets:
+#   openai-api-key:
+#     file: secret.openai-api-key
+
+# version: '3.9'
+
+# services:
+#   agents:
+#     build: .
+#     env_file:
+#       - .env
+#     command: poetry run python -m marketing_posts.crew
+#     secrets:
+#       - openai-api-key
+#     volumes:
+#       - .:/app
+
+# secrets:
+#   openai-api-key:
+#     file: secret.openai-api-key
+
+# version: '3.9'
+
+# services:
+#   agents:
+#     build: .
+#     env_file:
+#       - .env
+#     environment:
+#       - SERPER_API_KEY=${SERPER_API_KEY}
+#       - OPENAI_API_KEY=${OPENAI_API_KEY}
+#     command: poetry run python -m marketing_posts.crew
+#     secrets:
+#       - openai-api-key
+
+# secrets:
+#   openai-api-key:
+#     file: secret.openai-api-key
+
+
+# version: '3.9'
+
+# services:
+#   agents:
+#     build: .
+#     env_file:
+#       - .env
+#     environment:
+#       - SERPER_API_KEY
+#       - OPENAI_API_KEY
+#     command: poetry run python -m marketing_posts.crew
+#     secrets:
+#       - openai-api-key
+
+# secrets:
+#   openai-api-key:
+#     file: secret.openai-api-key
+
+
+# version: '3.9'
+
+# services:
+#   agents:
+#     build: .
+#     env_file:
+#       - .env
+#     environment:
+#       SERPER_API_KEY: ${SERPER_API_KEY}
+#       OPENAI_API_KEY: ${OPENAI_API_KEY}
+#     command: poetry run python -m marketing_posts.crew
+#     secrets:
+#       - openai-api-key
+
+# secrets:
+#   openai-api-key:
+#     file: secret.openai-api-key
+
+
+# version: '3.9'
+
+# services:
+#   agents:
+#     build: .
+#     env_file:
+#       - .env
+#     environment:
+#       # SERPER_API_KEY is still passed as an environment variable
+#       SERPER_API_KEY: ${SERPER_API_KEY}
+#       # OPENAI_API_KEY is now read from the secret file, so remove it from here
+#       # OPENAI_API_KEY: ${OPENAI_API_KEY} # REMOVE OR COMMENT THIS LINE
+#     command: poetry run streamlit run app/streamlit_app.py --server.port 8000 --server.address 0.0.0.0
+#     ports:
+#       - "8000:8000" # Expose port 8000 for Streamlit
+#     secrets:
+#       - openai-api-key
+#     volumes:
+#       - ./app:/app # Mount your app directory for Streamlit and CrewAI code
+#       - ./config:/app/config # Mount config directory
+#       # You might need to adjust this if your tools.py is not directly in 'app' or 'marketing_posts'
+#       # Assuming 'marketing_posts' is a package inside 'app'
+#       - ./marketing_posts:/app/marketing_posts # Ensure the marketing_posts package is available
+
+# secrets:
+#   openai-api-key:
+#     file: secret.openai-api-key
+
+
+version: '3.9'
+
+services:
+  agents:
+    build: . # Build context is the current directory (crew-ai/)
+    env_file:
+      - .env # Load variables from .env in the project root
+    environment:
+      # Pass SERPER_API_KEY from .env into the container's environment
+      SERPER_API_KEY: ${SERPER_API_KEY}
+      # IMPORTANT: OPENAI_API_KEY is read from the secret file, so it should NOT be here
+    command: poetry run streamlit run src/marketing_posts/streamlit_app.py --server.port 8000 --server.address 0.0.0.0
+
+    ports:
+      - "8000:8000" # Map container port 8000 to host port 8000 for Streamlit UI
+    secrets:
+      - openai-api-key
+    volumes:
+      - .:/app  # Mount the entire project directory to /app inside container
+
+secrets:
+  openai-api-key:
+    file: secret.openai-api-key
