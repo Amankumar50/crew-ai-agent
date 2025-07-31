@@ -3178,239 +3178,12 @@
 
 
 
-import streamlit as st
-import os
-import json
-from dotenv import load_dotenv
-from marketing_posts.crew import MarketingPostsCrew
-import streamlit.components.v1 as components
-
-# --- Load API Keys ---
-load_dotenv()
-serper_api_key = os.getenv("SERPER_API_KEY")
-openai_secret_path = "/run/secrets/openai-api-key"
-
-if os.path.exists(openai_secret_path):
-    with open(openai_secret_path, "r") as f:
-        openai_api_key = f.read().strip()
-else:
-    st.error("Missing OpenAI secret file.")
-    st.stop()
-
-os.environ["SERPER_API_KEY"] = serper_api_key or ''
-os.environ["OPENAI_API_KEY"] = openai_api_key or ''
-
-if not serper_api_key or not openai_api_key:
-    st.error("API keys missing. Check .env or Docker secrets.")
-    st.stop()
-
-# --- Static Descriptions for Each Step ---
-static_step_descriptions = {
-    "step1": ("Lead Market Analyst (Research)", "Performs domain-specific market research."),
-    "step2": ("Chief Marketing Strategist (Understanding)", "Interprets goals and research."),
-    "step3": ("Chief Marketing Strategist (Strategy)", "Creates tactical marketing strategy."),
-    "step4": ("Creative Content Creator (Campaign)", "Generates creative campaign ideas."),
-    "step5": ("Creative Content Creator (Copy)", "Writes marketing copies."),
-    "step6": ("Chief Creative Director (Consolidate)", "Consolidates all outputs for display.")
-}
-
-# --- Streamlit App Config ---
-st.set_page_config(layout="wide", page_title="AI Marketing Studio")
-st.title("AI Marketing Studio")
-st.markdown("---")
-
-query_params = st.query_params
-selected_step_id = query_params.get("step", None)
-
-# --- STEP DETAIL PAGE ---
-if selected_step_id:
-    if "full_task_outputs" not in st.session_state or not st.session_state.full_task_outputs:
-        st.warning("You must generate a campaign first.")
-        st.markdown("[Back to Home](/)")
-        st.stop()
-
-    step_label, step_desc = static_step_descriptions.get(selected_step_id, ("Unknown Step", ""))
-    st.header(step_label)
-    st.caption(step_desc)
-    st.markdown("---")
-    st.subheader("Output from this step:")
-    output = st.session_state.full_task_outputs.get(selected_step_id, "No output for this step.")
-    st.code(output, language="json")
-    st.markdown("[Back to Home](/)")
-    st.stop()
-
-# --- MAIN PAGE ---
-st.header("Define Your Project")
-customer_domain = st.text_input("Customer Domain", placeholder="e.g., fintech, healthcare")
-project_description = st.text_area("Project Description", height=200, placeholder="Describe your product...")
-
-st.markdown("---")
-
-# Initialize session states
-if 'full_task_outputs' not in st.session_state:
-    st.session_state.full_task_outputs = {}
-    st.session_state.final_consolidated_output = {}
-
-# --- Run Crew & Cache Output ---
-@st.cache_data(show_spinner=False)
-def run_crew_ai(domain, desc):
-    inputs = {"customer_domain": domain, "project_description": desc}
-    crew_result = MarketingPostsCrew().crew().kickoff(inputs=inputs)
-
-    results_dict = crew_result.json_dict if hasattr(crew_result, 'json_dict') else json.loads(str(crew_result))
-    outputs = {}
-    if hasattr(crew_result, 'tasks_output'):
-        for i, task_output in enumerate(crew_result.tasks_output):
-            key = f"step{i+1}"
-            if isinstance(task_output, (dict, list)):
-                outputs[key] = json.dumps(task_output, indent=2)
-            elif hasattr(task_output, "model_dump_json"):
-                outputs[key] = task_output.model_dump_json(indent=2)
-            else:
-                outputs[key] = str(task_output)
-    else:
-        outputs["step6"] = json.dumps(results_dict, indent=2)
-
-    return outputs, results_dict
-
-# --- Button Logic ---
-if st.button("Generate Marketing Campaign"):
-    if not customer_domain or not project_description:
-        st.error("Please provide both inputs.")
-    else:
-        st.subheader("Generating Campaign...")
-        with st.spinner("Running CrewAI..."):
-            try:
-                step_outputs, final_output = run_crew_ai(customer_domain, project_description)
-                st.session_state.full_task_outputs = step_outputs
-                st.session_state.final_consolidated_output = final_output
-                st.rerun()
-            except Exception as e:
-                st.error("Error occurred while generating campaign.")
-                st.exception(e)
-
-# --- Storyline Visualization ---
-# --- Storyline Visualization ---
-# --- Storyline Visualization ---
-if st.session_state.get("full_task_outputs"):
-    st.subheader("🗺️ Workflow Overview")
-
-    st.title("Crew Agent Workflow")
-
-    st.graphviz_chart("""
-    digraph CrewWorkflow {
-        rankdir=TB
-        node [shape=box, style=rounded, fontname="Helvetica", fontsize=11, color=black, width=2, height=0.8]
-
-        // Nodes
-        Analyst [label="Lead Market Analyst\\n(Research)"]
-        Strategist [label="Chief Marketing Strategist\\n(Understanding)"]
-        Creator1 [label="Creative Content Creator\\n(Campaign Ideas)"]
-        Creator2 [label="Creative Content Creator\\n(Copywriting)"]
-        Director [label="Chief Creative Director\\n(Consolidation)"]
-
-        // Invisible helper nodes for text descriptions
-        desc1 [label="Performs domain-specific market research", shape=none, fontcolor=gray, fontsize=10]
-        desc2 [label="Interprets goals and research", shape=none, fontcolor=gray, fontsize=10]
-        desc3 [label="Generates creative campaign ideas", shape=none, fontcolor=gray, fontsize=10]
-        desc4 [label="Writes marketing copies", shape=none, fontcolor=gray, fontsize=10]
-        desc5 [label="Consolidates all outputs for display", shape=none, fontcolor=gray, fontsize=10]
-
-        // Layout edges
-        Analyst -> Strategist
-        Strategist -> Creator1
-        Strategist -> Creator2
-        Creator1 -> Director
-        Creator2 -> Director
-
-        // Descriptions connected to respective nodes
-        Analyst -> desc1 [style=invis]
-        Strategist -> desc2 [style=invis]
-        Creator1 -> desc3 [style=invis]
-        Creator2 -> desc4 [style=invis]
-        Director -> desc5 [style=invis]
-
-        {rank=same; Creator1; Creator2}
-    }
-    """, use_container_width=True)
-
-    st.markdown("---")
-
-    st.subheader("🎬 Campaign Storyline View")
-    storyline_steps = [
-        ("Scene 1: The Analyst Arrives", "step1"),
-        ("Scene 2: Strategist Understands Goals", "step2"),
-        ("Scene 3: Strategy is Designed", "step3"),
-        ("Scene 4: Campaign Ideas Flow", "step4"),
-        ("Scene 5: Words that Persuade", "step5"),
-        ("Scene 6: Everything Comes Together", "step6")
-    ]
-
-    for title, step_id in storyline_steps:
-        label, _ = static_step_descriptions.get(step_id, (step_id, ""))
-        with st.expander(f"{title} - {label}"):
-            output = st.session_state.full_task_outputs.get(step_id, "No output available.")
-            st.code(output, language="json")
-
-    st.markdown("---")
-
-    st.header("Final Consolidated Output")
-    final = st.session_state.get("final_consolidated_output", {})
-    if final:
-        st.subheader("Research Summary")
-        st.markdown(final.get("research_summary", "Not available."))
-
-        st.subheader("Project Understanding")
-        st.markdown(final.get("project_understanding", "Not available."))
-
-        st.subheader("Marketing Strategy")
-        strategy = final.get("marketing_strategy", {})
-        if strategy:
-            st.markdown(f"**Name:** {strategy.get('name', '')}")
-            st.markdown("**Tactics:**")
-            for t in strategy.get("tactics", []):
-                st.markdown(f"- {t}")
-            st.markdown("**Channels:**")
-            for c in strategy.get("channels", []):
-                st.markdown(f"- {c}")
-            st.markdown("**KPIs:**")
-            for k in strategy.get("KPIs", []):
-                st.markdown(f"- {k}")
-        else:
-            st.info("Strategy not found.")
-
-        st.markdown("---")
-        st.subheader("Creative Campaign Ideas")
-        ideas = final.get("campaign_ideas", {})
-        st.markdown(f"**Title:** {ideas.get('title', 'N/A')}")
-        for i, idea in enumerate(ideas.get("ideas", [])):
-            st.markdown(f"**Campaign {i+1}: {idea.get('name', '')}**")
-            st.markdown(f"**Description:** {idea.get('description', '')}")
-            st.markdown(f"**Audience:** {idea.get('audience', '')}")
-            st.markdown(f"**Channel:** {idea.get('channel', '')}")
-            st.markdown("---")
-
-        st.subheader("Marketing Copies")
-        for i, copy in enumerate(final.get("marketing_copies", [])):
-            st.markdown(f"**Copy {i+1}: {copy.get('title', '')}**")
-            st.write(copy.get("body", ""))
-            st.markdown("---")
-    else:
-        st.info("Campaign output will appear here after generation.")
-
-
-st.markdown("---")
-st.caption("Powered by CrewAI, OpenAI, Serper & Streamlit")
-
-
-
-
-
 # import streamlit as st
 # import os
 # import json
 # from dotenv import load_dotenv
 # from marketing_posts.crew import MarketingPostsCrew
+# import streamlit.components.v1 as components
 
 # # --- Load API Keys ---
 # load_dotenv()
@@ -3431,60 +3204,1592 @@ st.caption("Powered by CrewAI, OpenAI, Serper & Streamlit")
 #     st.error("API keys missing. Check .env or Docker secrets.")
 #     st.stop()
 
-# st.set_page_config(layout="centered", page_title="AI Marketing Storyline")
-# st.title("AI Marketing Storyline")
+# # --- Static Descriptions for Each Step ---
+# static_step_descriptions = {
+#     "step1": ("Lead Market Analyst (Research)", "Performs domain-specific market research."),
+#     "step2": ("Chief Marketing Strategist (Understanding)", "Interprets goals and research."),
+#     "step3": ("Chief Marketing Strategist (Strategy)", "Creates tactical marketing strategy."),
+#     "step4": ("Creative Content Creator (Campaign)", "Generates creative campaign ideas."),
+#     "step5": ("Creative Content Creator (Copy)", "Writes marketing copies."),
+#     "step6": ("Chief Creative Director (Consolidate)", "Consolidates all outputs for display.")
+# }
+
+# # --- Streamlit App Config ---
+# st.set_page_config(layout="wide", page_title="AI Marketing Studio")
+# st.title("AI Marketing Studio")
 # st.markdown("---")
 
-# # --- Input Form ---
+# query_params = st.query_params
+# selected_step_id = query_params.get("step", None)
+
+# # --- STEP DETAIL PAGE ---
+# if selected_step_id:
+#     if "full_task_outputs" not in st.session_state or not st.session_state.full_task_outputs:
+#         st.warning("You must generate a campaign first.")
+#         st.markdown("[Back to Home](/)")
+#         st.stop()
+
+#     step_label, step_desc = static_step_descriptions.get(selected_step_id, ("Unknown Step", ""))
+#     st.header(step_label)
+#     st.caption(step_desc)
+#     st.markdown("---")
+#     st.subheader("Output from this step:")
+#     output = st.session_state.full_task_outputs.get(selected_step_id, "No output for this step.")
+#     st.code(output, language="json")
+#     st.markdown("[Back to Home](/)")
+#     st.stop()
+
+# # --- MAIN PAGE ---
 # st.header("Define Your Project")
-# domain = st.text_input("Customer Domain", placeholder="e.g., fintech, healthcare")
-# description = st.text_area("Project Description", height=150, placeholder="Describe your product or campaign goal...")
+# customer_domain = st.text_input("Customer Domain", placeholder="e.g., fintech, healthcare")
+# project_description = st.text_area("Project Description", height=200, placeholder="Describe your product...")
 
-# # --- Session State Initialization ---
-# if 'storyline_outputs' not in st.session_state:
-#     st.session_state.storyline_outputs = []
+# st.markdown("---")
 
-# # --- Run CrewAI and Format Storyline ---
+# # Initialize session states
+# if 'full_task_outputs' not in st.session_state:
+#     st.session_state.full_task_outputs = {}
+#     st.session_state.final_consolidated_output = {}
+
+# # --- Run Crew & Cache Output ---
 # @st.cache_data(show_spinner=False)
-# def run_and_generate_story(domain, description):
-#     inputs = {"customer_domain": domain, "project_description": description}
+# def run_crew_ai(domain, desc):
+#     inputs = {"customer_domain": domain, "project_description": desc}
 #     crew_result = MarketingPostsCrew().crew().kickoff(inputs=inputs)
 
 #     results_dict = crew_result.json_dict if hasattr(crew_result, 'json_dict') else json.loads(str(crew_result))
-#     tasks = crew_result.tasks_output if hasattr(crew_result, 'tasks_output') else []
-
-#     storyline = []
-#     for i, task in enumerate(tasks):
-#         agent_name = f"Agent {i+1}"
-#         content = task.model_dump_json(indent=2) if hasattr(task, 'model_dump_json') else str(task)
-#         storyline.append({
-#             "scene": f"Scene {i+1}",
-#             "agent": agent_name,
-#             "content": content
-#         })
-
-#     return storyline
-
-# # --- Trigger Storyline Generation ---
-# if st.button("Generate Storyline"):
-#     if not domain or not description:
-#         st.error("Please provide both domain and description.")
+#     outputs = {}
+#     if hasattr(crew_result, 'tasks_output'):
+#         for i, task_output in enumerate(crew_result.tasks_output):
+#             key = f"step{i+1}"
+#             if isinstance(task_output, (dict, list)):
+#                 outputs[key] = json.dumps(task_output, indent=2)
+#             elif hasattr(task_output, "model_dump_json"):
+#                 outputs[key] = task_output.model_dump_json(indent=2)
+#             else:
+#                 outputs[key] = str(task_output)
 #     else:
-#         with st.spinner("Running CrewAI and crafting storyline..."):
+#         outputs["step6"] = json.dumps(results_dict, indent=2)
+
+#     return outputs, results_dict
+
+# # --- Button Logic ---
+# if st.button("Generate Marketing Campaign"):
+#     if not customer_domain or not project_description:
+#         st.error("Please provide both inputs.")
+#     else:
+#         st.subheader("Generating Campaign...")
+#         with st.spinner("Running CrewAI..."):
 #             try:
-#                 storyline = run_and_generate_story(domain, description)
-#                 st.session_state.storyline_outputs = storyline
-#                 st.success("Storyline generated successfully!")
+#                 step_outputs, final_output = run_crew_ai(customer_domain, project_description)
+#                 st.session_state.full_task_outputs = step_outputs
+#                 st.session_state.final_consolidated_output = final_output
+#                 st.rerun()
 #             except Exception as e:
-#                 st.error("Error during generation.")
+#                 st.error("Error occurred while generating campaign.")
 #                 st.exception(e)
 
-# # --- Storyline Display ---
-# if st.session_state.storyline_outputs:
-#     st.subheader("Campaign Storyline")
-#     for i, step in enumerate(st.session_state.storyline_outputs):
-#         with st.expander(f"{step['scene']} ({step['agent']})", expanded=i==0):
-#             st.code(step["content"], language="json")
+# # --- Storyline Visualization ---
+# # --- Storyline Visualization ---
+# # --- Storyline Visualization ---
+# if st.session_state.get("full_task_outputs"):
+#     st.subheader("🗺️ Workflow Overview")
+
+#     st.title("Crew Agent Workflow")
+
+#     st.graphviz_chart("""
+#     digraph CrewWorkflow {
+#         rankdir=TB
+#         node [shape=box, style=rounded, fontname="Helvetica", fontsize=11, color=black, width=2, height=0.8]
+
+#         // Nodes
+#         Analyst [label="Lead Market Analyst\\n(Research)"]
+#         Strategist [label="Chief Marketing Strategist\\n(Understanding)"]
+#         Creator1 [label="Creative Content Creator\\n(Campaign Ideas)"]
+#         Creator2 [label="Creative Content Creator\\n(Copywriting)"]
+#         Director [label="Chief Creative Director\\n(Consolidation)"]
+
+#         // Invisible helper nodes for text descriptions
+#         desc1 [label="Performs domain-specific market research", shape=none, fontcolor=gray, fontsize=10]
+#         desc2 [label="Interprets goals and research", shape=none, fontcolor=gray, fontsize=10]
+#         desc3 [label="Generates creative campaign ideas", shape=none, fontcolor=gray, fontsize=10]
+#         desc4 [label="Writes marketing copies", shape=none, fontcolor=gray, fontsize=10]
+#         desc5 [label="Consolidates all outputs for display", shape=none, fontcolor=gray, fontsize=10]
+
+#         // Layout edges
+#         Analyst -> Strategist
+#         Strategist -> Creator1
+#         Strategist -> Creator2
+#         Creator1 -> Director
+#         Creator2 -> Director
+
+#         // Descriptions connected to respective nodes
+#         Analyst -> desc1 [style=invis]
+#         Strategist -> desc2 [style=invis]
+#         Creator1 -> desc3 [style=invis]
+#         Creator2 -> desc4 [style=invis]
+#         Director -> desc5 [style=invis]
+
+#         {rank=same; Creator1; Creator2}
+#     }
+#     """, use_container_width=True)
+
+#     st.markdown("---")
+
+#     st.subheader("🎬 Campaign Storyline View")
+#     storyline_steps = [
+#         ("Scene 1: The Analyst Arrives", "step1"),
+#         ("Scene 2: Strategist Understands Goals", "step2"),
+#         ("Scene 3: Strategy is Designed", "step3"),
+#         ("Scene 4: Campaign Ideas Flow", "step4"),
+#         ("Scene 5: Words that Persuade", "step5"),
+#         ("Scene 6: Everything Comes Together", "step6")
+#     ]
+
+#     for title, step_id in storyline_steps:
+#         label, _ = static_step_descriptions.get(step_id, (step_id, ""))
+#         with st.expander(f"{title} - {label}"):
+#             output = st.session_state.full_task_outputs.get(step_id, "No output available.")
+#             st.code(output, language="json")
+
+#     st.markdown("---")
+
+#     st.header("Final Consolidated Output")
+#     final = st.session_state.get("final_consolidated_output", {})
+#     if final:
+#         st.subheader("Research Summary")
+#         st.markdown(final.get("research_summary", "Not available."))
+
+#         st.subheader("Project Understanding")
+#         st.markdown(final.get("project_understanding", "Not available."))
+
+#         st.subheader("Marketing Strategy")
+#         strategy = final.get("marketing_strategy", {})
+#         if strategy:
+#             st.markdown(f"**Name:** {strategy.get('name', '')}")
+#             st.markdown("**Tactics:**")
+#             for t in strategy.get("tactics", []):
+#                 st.markdown(f"- {t}")
+#             st.markdown("**Channels:**")
+#             for c in strategy.get("channels", []):
+#                 st.markdown(f"- {c}")
+#             st.markdown("**KPIs:**")
+#             for k in strategy.get("KPIs", []):
+#                 st.markdown(f"- {k}")
+#         else:
+#             st.info("Strategy not found.")
+
+#         st.markdown("---")
+#         st.subheader("Creative Campaign Ideas")
+#         ideas = final.get("campaign_ideas", {})
+#         st.markdown(f"**Title:** {ideas.get('title', 'N/A')}")
+#         for i, idea in enumerate(ideas.get("ideas", [])):
+#             st.markdown(f"**Campaign {i+1}: {idea.get('name', '')}**")
+#             st.markdown(f"**Description:** {idea.get('description', '')}")
+#             st.markdown(f"**Audience:** {idea.get('audience', '')}")
+#             st.markdown(f"**Channel:** {idea.get('channel', '')}")
+#             st.markdown("---")
+
+#         st.subheader("Marketing Copies")
+#         for i, copy in enumerate(final.get("marketing_copies", [])):
+#             st.markdown(f"**Copy {i+1}: {copy.get('title', '')}**")
+#             st.write(copy.get("body", ""))
+#             st.markdown("---")
+#     else:
+#         st.info("Campaign output will appear here after generation.")
+
 
 # st.markdown("---")
 # st.caption("Powered by CrewAI, OpenAI, Serper & Streamlit")
+
+
+
+
+# import streamlit as st
+# import os
+# import json
+# from dotenv import load_dotenv
+# from marketing_posts.crew import MarketingPostsCrew
+# import streamlit.components.v1 as components
+
+# # --- Load API Keys ---
+# load_dotenv()
+# serper_api_key = os.getenv("SERPER_API_KEY")
+# openai_secret_path = "/run/secrets/openai-api-key"
+
+# if os.path.exists(openai_secret_path):
+#     with open(openai_secret_path, "r") as f:
+#         openai_api_key = f.read().strip()
+# else:
+#     st.error("Missing OpenAI secret file.")
+#     st.stop()
+
+# os.environ["SERPER_API_KEY"] = serper_api_key or ''
+# os.environ["OPENAI_API_KEY"] = openai_api_key or ''
+
+# if not serper_api_key or not openai_api_key:
+#     st.error("API keys missing. Check .env or Docker secrets.")
+#     st.stop()
+
+# # --- Static Descriptions for Each Step ---
+# static_step_descriptions = {
+#     "step1": ("Lead Market Analyst (Research)", "Performs domain-specific market research."),
+#     "step2": ("Chief Marketing Strategist (Understanding)", "Interprets goals and research."),
+#     "step3": ("Chief Marketing Strategist (Strategy)", "Creates tactical marketing strategy."),
+#     "step4": ("Creative Content Creator (Campaign)", "Generates creative campaign ideas."),
+#     "step5": ("Creative Content Creator (Copy)", "Writes marketing copies."),
+#     "step6": ("Chief Creative Director (Consolidate)", "Consolidates all outputs for display.")
+# }
+
+# # --- Streamlit App Config ---
+# st.set_page_config(layout="wide", page_title="AI Marketing Studio")
+# st.title("AI Marketing Studio")
+# st.markdown("---")
+
+# query_params = st.query_params
+# selected_step_id = query_params.get("step", None)
+
+# # --- STEP DETAIL PAGE ---
+# if selected_step_id:
+#     if "full_task_outputs" not in st.session_state or not st.session_state.full_task_outputs:
+#         st.warning("You must generate a campaign first.")
+#         st.markdown("[Back to Home](/)")
+#         st.stop()
+
+#     step_label, step_desc = static_step_descriptions.get(selected_step_id[0], ("Unknown Step", ""))
+#     st.header(step_label)
+#     st.caption(step_desc)
+#     st.markdown("---")
+#     st.subheader("Output from this step:")
+#     output = st.session_state.full_task_outputs.get(selected_step_id[0], "No output for this step.")
+#     st.code(output, language="json")
+#     st.markdown("[Back to Home](/)")
+#     st.stop()
+
+# # --- MAIN PAGE ---
+# st.header("Define Your Project")
+# customer_domain = st.text_input("Customer Domain", placeholder="e.g., fintech, healthcare")
+# project_description = st.text_area("Project Description", height=200, placeholder="Describe your product...")
+
+# st.markdown("---")
+
+# # Initialize session states
+# if 'full_task_outputs' not in st.session_state:
+#     st.session_state.full_task_outputs = {}
+#     st.session_state.final_consolidated_output = {}
+
+# # --- Run Crew & Cache Output ---
+# @st.cache_data(show_spinner=False)
+# def run_crew_ai(domain, desc):
+#     inputs = {"customer_domain": domain, "project_description": desc}
+#     crew_result = MarketingPostsCrew().crew().kickoff(inputs=inputs)
+
+#     results_dict = crew_result.json_dict if hasattr(crew_result, 'json_dict') else json.loads(str(crew_result))
+#     outputs = {}
+#     if hasattr(crew_result, 'tasks_output'):
+#         for i, task_output in enumerate(crew_result.tasks_output):
+#             key = f"step{i+1}"
+#             if isinstance(task_output, (dict, list)):
+#                 outputs[key] = json.dumps(task_output, indent=2)
+#             elif hasattr(task_output, "model_dump_json"):
+#                 outputs[key] = task_output.model_dump_json(indent=2)
+#             else:
+#                 outputs[key] = str(task_output)
+#     else:
+#         outputs["step6"] = json.dumps(results_dict, indent=2)
+
+#     return outputs, results_dict
+
+# # --- Button Logic ---
+# if st.button("Generate Marketing Campaign"):
+#     if not customer_domain or not project_description:
+#         st.error("Please provide both inputs.")
+#     else:
+#         st.subheader("Generating Campaign…")
+#         with st.spinner("Running CrewAI…"):
+#             try:
+#                 step_outputs, final_output = run_crew_ai(customer_domain, project_description)
+#                 st.session_state.full_task_outputs = step_outputs
+#                 st.session_state.final_consolidated_output = final_output
+#                 st.rerun()
+#             except Exception as e:
+#                 st.error("Error occurred while generating campaign.")
+#                 st.exception(e)
+
+# # --- Storyline Visualization ---
+# if st.session_state.get("full_task_outputs"):
+#     st.subheader("🗺️ Workflow Overview")
+#     st.title("Crew Agent Workflow")
+
+#     st.graphviz_chart("""
+#     digraph CrewWorkflow {
+#         rankdir=TB
+#         node [shape=box, style=rounded, fontname="Helvetica", fontsize=11, color=black, width=2, height=0.8]
+#         Analyst [label="Lead Market Analyst\\n(Research)"]
+#         Strategist [label="Chief Marketing Strategist\\n(Understanding)"]
+#         Creator1 [label="Creative Content Creator\\n(Campaign Ideas)"]
+#         Creator2 [label="Creative Content Creator\\n(Copywriting)"]
+#         Director [label="Chief Creative Director\\n(Consolidation)"]
+#         Analyst -> Strategist
+#         Strategist -> Creator1
+#         Strategist -> Creator2
+#         Creator1 -> Director
+#         Creator2 -> Director
+#     }
+#     """, use_container_width=True)
+
+#     st.markdown("---")
+#     st.subheader("🎬 Campaign Storyline View")
+#     storyline_steps = [
+#         ("Scene 1: The Analyst Arrives", "step1"),
+#         ("Scene 2: Strategist Understands Goals", "step2"),
+#         ("Scene 3: Strategy is Designed", "step3"),
+#         ("Scene 4: Campaign Ideas Flow", "step4"),
+#         ("Scene 5: Words that Persuade", "step5"),
+#         ("Scene 6: Everything Comes Together", "step6")
+#     ]
+
+#     for title, step_id in storyline_steps:
+#         label, _ = static_step_descriptions.get(step_id, (step_id, ""))
+#         with st.expander(f"{title} - {label}"):
+#             output = st.session_state.full_task_outputs.get(step_id, "No output available.")
+#             st.code(output, language="json")
+
+#     # --- Agent-wise Grouped Output ---
+#     st.markdown("---")
+#     st.header("📦 Agent‑wise Final Output")
+
+#     final = st.session_state.final_consolidated_output or {}
+
+#     with st.expander("👨‍💼 Lead Market Analyst"):
+#         out1 = st.session_state.full_task_outputs.get("step1")
+#         if out1:
+#             st.subheader("Step 1 Output (Research)")
+#             st.code(out1, language="json")
+#         st.subheader("Research Summary")
+#         st.markdown(final.get("research_summary", "Not available."))
+
+#     with st.expander("👩‍💼 Chief Marketing Strategist"):
+#         out2 = st.session_state.full_task_outputs.get("step2")
+#         if out2:
+#             st.subheader("Step 2 Output (Understanding)")
+#             st.code(out2, language="json")
+#         st.subheader("Project Understanding")
+#         st.markdown(final.get("project_understanding", "Not available."))
+#         out3 = st.session_state.full_task_outputs.get("step3")
+#         if out3:
+#             st.subheader("Step 3 Output (Strategy)")
+#             st.code(out3, language="json")
+#         strat = final.get("marketing_strategy", {})
+#         st.subheader("Marketing Strategy")
+#         if strat:
+#             st.markdown(f"**Name:** {strat.get('name', '')}")
+#             for heading, items in [("Tactics", strat.get("tactics", [])),
+#                                    ("Channels", strat.get("channels", [])),
+#                                    ("KPIs", strat.get("KPIs", []))]:
+#                 st.markdown(f"**{heading}:**")
+#                 for item in items:
+#                     st.markdown(f"- {item}")
+
+#     with st.expander("✍️ Creative Content Creator"):
+#         out4 = st.session_state.full_task_outputs.get("step4")
+#         if out4:
+#             st.subheader("Step 4 Output (Campaign Ideas)")
+#             st.code(out4, language="json")
+#         ci = final.get("campaign_ideas", {})
+#         st.subheader("Final Campaign Ideas")
+#         st.markdown(f"**Title:** {ci.get('title', '')}")
+#         for idea in ci.get("ideas", []):
+#             st.markdown(f"**{idea.get('name', '')}:** {idea.get('description', '')}")
+#         out5 = st.session_state.full_task_outputs.get("step5")
+#         if out5:
+#             st.subheader("Step 5 Output (Copies)")
+#             st.code(out5, language="json")
+#         st.subheader("Final Marketing Copies")
+#         for copy in final.get("marketing_copies", []):
+#             st.markdown(f"**{copy.get('title', '')}**")
+#             st.write(copy.get("body", ""))
+
+#     with st.expander("🎬 Chief Creative Director"):
+#         out6 = st.session_state.full_task_outputs.get("step6")
+#         if out6:
+#             st.subheader("Step 6 Output (Consolidation)")
+#             st.code(out6, language="json")
+#         st.subheader("Final Consolidated Output (JSON)")
+#         st.code(json.dumps(final, indent=2), language="json")
+
+# st.markdown("---")
+# st.caption("Powered by CrewAI, OpenAI, Serper & Streamlit")
+
+
+
+
+
+
+# import streamlit as st
+# import os
+# import json
+# from dotenv import load_dotenv
+# from marketing_posts.crew import MarketingPostsCrew
+# import streamlit.components.v1 as components
+
+# # --- Load API Keys ---
+# load_dotenv()
+# serper_api_key = os.getenv("SERPER_API_KEY")
+# openai_secret_path = "/run/secrets/openai-api-key"
+
+# if os.path.exists(openai_secret_path):
+#     with open(openai_secret_path, "r") as f:
+#         openai_api_key = f.read().strip()
+# else:
+#     st.error("Missing OpenAI secret file.")
+#     st.stop()
+
+# os.environ["SERPER_API_KEY"] = serper_api_key or ''
+# os.environ["OPENAI_API_KEY"] = openai_api_key or ''
+
+# if not serper_api_key or not openai_api_key:
+#     st.error("API keys missing. Check .env or Docker secrets.")
+#     st.stop()
+
+# # --- Static Descriptions for Each Step ---
+# static_step_descriptions = {
+#     "step1": ("Lead Market Analyst (Research)", "Performs domain-specific market research."),
+#     "step2": ("Chief Marketing Strategist (Understanding)", "Interprets goals and research."),
+#     "step3": ("Chief Marketing Strategist (Strategy)", "Creates tactical marketing strategy."),
+#     "step4": ("Creative Content Creator (Campaign)", "Generates creative campaign ideas."),
+#     "step5": ("Creative Content Creator (Copy)", "Writes marketing copies."),
+#     "step6": ("Chief Creative Director (Consolidate)", "Consolidates all outputs for display.")
+# }
+
+# # --- Streamlit App Config ---
+# st.set_page_config(layout="wide", page_title="AI Marketing Studio")
+# st.title("AI Marketing Studio")
+# st.markdown("---")
+
+# query_params = st.query_params
+# selected_step_id = query_params.get("step", None)
+
+# # --- STEP DETAIL PAGE ---
+# if selected_step_id:
+#     if "full_task_outputs" not in st.session_state or not st.session_state.full_task_outputs:
+#         st.warning("You must generate a campaign first.")
+#         st.markdown("[Back to Home](/)")
+#         st.stop()
+
+#     step_label, step_desc = static_step_descriptions.get(selected_step_id[0], ("Unknown Step", ""))
+#     st.header(step_label)
+#     st.caption(step_desc)
+#     st.markdown("---")
+#     st.subheader("Output from this step:")
+#     output = st.session_state.full_task_outputs.get(selected_step_id[0], "No output for this step.")
+#     st.code(output, language="json")
+#     st.markdown("[Back to Home](/)")
+#     st.stop()
+
+# # --- MAIN PAGE ---
+# st.header("Define Your Project")
+# customer_domain = st.text_input("Customer Domain", placeholder="e.g., fintech, healthcare")
+# project_description = st.text_area("Project Description", height=200, placeholder="Describe your product...")
+# st.markdown("---")
+
+# # Initialize session states
+# if 'full_task_outputs' not in st.session_state:
+#     st.session_state.full_task_outputs = {}
+#     st.session_state.final_consolidated_output = {}
+
+# # --- Run Crew & Cache Output ---
+# @st.cache_data(show_spinner=False)
+# def run_crew_ai(domain, desc):
+#     inputs = {"customer_domain": domain, "project_description": desc}
+#     crew_result = MarketingPostsCrew().crew().kickoff(inputs=inputs)
+#     results_dict = crew_result.json_dict if hasattr(crew_result, 'json_dict') else json.loads(str(crew_result))
+#     outputs = {}
+#     if hasattr(crew_result, 'tasks_output'):
+#         for i, task_output in enumerate(crew_result.tasks_output):
+#             key = f"step{i+1}"
+#             if isinstance(task_output, (dict, list)):
+#                 outputs[key] = json.dumps(task_output, indent=2)
+#             elif hasattr(task_output, "model_dump_json"):
+#                 outputs[key] = task_output.model_dump_json(indent=2)
+#             else:
+#                 outputs[key] = str(task_output)
+#     else:
+#         outputs["step6"] = json.dumps(results_dict, indent=2)
+#     return outputs, results_dict
+
+# # --- Button Logic ---
+# if st.button("Generate Marketing Campaign"):
+#     if not customer_domain or not project_description:
+#         st.error("Please provide both inputs.")
+#     else:
+#         st.subheader("Generating Campaign…")
+#         with st.spinner("Running CrewAI…"):
+#             try:
+#                 step_outputs, final_output = run_crew_ai(customer_domain, project_description)
+#                 st.session_state.full_task_outputs = step_outputs
+#                 st.session_state.final_consolidated_output = final_output
+#                 st.rerun()
+#             except Exception as e:
+#                 st.error("Error occurred while generating campaign.")
+#                 st.exception(e)
+
+# # --- Agent-wise Grouped Output ---
+# if st.session_state.get("full_task_outputs"):
+#     st.markdown("---")
+#     st.header("📦 Agent‑wise Final Output")
+#     final = st.session_state.final_consolidated_output or {}
+
+#     with st.expander("👨‍💼 Lead Market Analyst"):
+#         out1 = st.session_state.full_task_outputs.get("step1")
+#         if out1:
+#             st.subheader("Step 1 Output (Research)")
+#             st.code(out1, language="json")
+#         st.subheader("Research Summary")
+#         st.markdown(final.get("research_summary", "Not available."))
+
+#     with st.expander("👩‍💼 Chief Marketing Strategist"):
+#         out2 = st.session_state.full_task_outputs.get("step2")
+#         if out2:
+#             st.subheader("Step 2 Output (Understanding)")
+#             st.code(out2, language="json")
+#         st.subheader("Project Understanding")
+#         st.markdown(final.get("project_understanding", "Not available."))
+#         out3 = st.session_state.full_task_outputs.get("step3")
+#         if out3:
+#             st.subheader("Step 3 Output (Strategy)")
+#             st.code(out3, language="json")
+#         strat = final.get("marketing_strategy", {})
+#         st.subheader("Marketing Strategy")
+#         if strat:
+#             st.markdown(f"**Name:** {strat.get('name', '')}")
+#             for heading, items in [("Tactics", strat.get("tactics", [])),
+#                                    ("Channels", strat.get("channels", [])),
+#                                    ("KPIs", strat.get("KPIs", []))]:
+#                 st.markdown(f"**{heading}:**")
+#                 for item in items:
+#                     st.markdown(f"- {item}")
+
+#     with st.expander("✍️ Creative Content Creator"):
+#         out4 = st.session_state.full_task_outputs.get("step4")
+#         if out4:
+#             st.subheader("Step 4 Output (Campaign Ideas)")
+#             st.code(out4, language="json")
+#         ci = final.get("campaign_ideas", {})
+#         st.subheader("Final Campaign Ideas")
+#         st.markdown(f"**Title:** {ci.get('title', '')}")
+#         for idea in ci.get("ideas", []):
+#             st.markdown(f"**{idea.get('name', '')}:** {idea.get('description', '')}")
+#         out5 = st.session_state.full_task_outputs.get("step5")
+#         if out5:
+#             st.subheader("Step 5 Output (Copies)")
+#             st.code(out5, language="json")
+#         st.subheader("Final Marketing Copies")
+#         for copy in final.get("marketing_copies", []):
+#             st.markdown(f"**{copy.get('title', '')}**")
+#             st.write(copy.get("body", ""))
+
+#     with st.expander("🎬 Chief Creative Director"):
+#         final_text_output = final.get("final_consolidation_output")
+#         if final_text_output:
+#             st.subheader("✅ Final Creative Content")
+#             st.markdown(final_text_output)
+#         else:
+#             out6 = st.session_state.full_task_outputs.get("step6")
+#             if out6:
+#                 st.subheader("Step 6 Output (Consolidation)")
+#                 st.code(out6, language="json")
+#             st.subheader("Final Consolidated Output (JSON)")
+#             st.code(json.dumps(final, indent=2), language="json")
+
+# st.markdown("---")
+# st.caption("Powered by CrewAI, OpenAI, Serper & Streamlit")
+
+
+# import streamlit as st
+# import os
+# import json
+# from dotenv import load_dotenv
+# from marketing_posts.crew import MarketingPostsCrew
+# import streamlit.components.v1 as components
+
+# # --- Load API Keys ---
+# load_dotenv()
+# serper_api_key = os.getenv("SERPER_API_KEY")
+# openai_secret_path = "/run/secrets/openai-api-key"
+
+# if os.path.exists(openai_secret_path):
+#     with open(openai_secret_path, "r") as f:
+#         openai_api_key = f.read().strip()
+# else:
+#     st.error("Missing OpenAI secret file.")
+#     st.stop()
+
+# os.environ["SERPER_API_KEY"] = serper_api_key or ''
+# os.environ["OPENAI_API_KEY"] = openai_api_key or ''
+
+# if not serper_api_key or not openai_api_key:
+#     st.error("API keys missing. Check .env or Docker secrets.")
+#     st.stop()
+
+# # --- Static Descriptions for Each Step ---
+# static_step_descriptions = {
+#     "step1": ("Lead Market Analyst (Research)", "Performs domain-specific market research."),
+#     "step2": ("Chief Marketing Strategist (Understanding)", "Interprets goals and research."),
+#     "step3": ("Chief Marketing Strategist (Strategy)", "Creates tactical marketing strategy."),
+#     "step4": ("Creative Content Creator (Campaign)", "Generates creative campaign ideas."),
+#     "step5": ("Creative Content Creator (Copy)", "Writes marketing copies."),
+#     "step6": ("Chief Creative Director (Consolidate)", "Consolidates all outputs for display.")
+# }
+
+# # --- Streamlit App Config ---
+# st.set_page_config(layout="wide", page_title="AI Marketing Studio")
+# st.title("AI Marketing Studio")
+# st.markdown("---")
+
+# query_params = st.query_params
+# selected_step_id = query_params.get("step", None)
+
+# # --- STEP DETAIL PAGE ---
+# if selected_step_id:
+#     if "full_task_outputs" not in st.session_state or not st.session_state.full_task_outputs:
+#         st.warning("You must generate a campaign first.")
+#         st.markdown("[Back to Home](/)")
+#         st.stop()
+
+#     step_label, step_desc = static_step_descriptions.get(selected_step_id[0], ("Unknown Step", ""))
+#     st.header(step_label)
+#     st.caption(step_desc)
+#     st.markdown("---")
+#     st.subheader("Output from this step:")
+#     output = st.session_state.full_task_outputs.get(selected_step_id[0], "No output for this step.")
+#     st.code(output, language="json")
+#     st.markdown("[Back to Home](/)")
+#     st.stop()
+
+# # --- MAIN PAGE ---
+# st.header("Define Your Project")
+# customer_domain = st.text_input("Customer Domain", placeholder="e.g., fintech, healthcare")
+# project_description = st.text_area("Project Description", height=200, placeholder="Describe your product...")
+# st.markdown("---")
+
+# # Initialize session states
+# if 'full_task_outputs' not in st.session_state:
+#     st.session_state.full_task_outputs = {}
+#     st.session_state.final_consolidated_output = {}
+
+# # --- Run Crew & Cache Output ---
+# @st.cache_data(show_spinner=False)
+# def run_crew_ai(domain, desc):
+#     inputs = {"customer_domain": domain, "project_description": desc}
+#     crew_result = MarketingPostsCrew().crew().kickoff(inputs=inputs)
+#     results_dict = crew_result.json_dict if hasattr(crew_result, 'json_dict') else json.loads(str(crew_result))
+#     outputs = {}
+#     if hasattr(crew_result, 'tasks_output'):
+#         for i, task_output in enumerate(crew_result.tasks_output):
+#             key = f"step{i+1}"
+#             if isinstance(task_output, (dict, list)):
+#                 outputs[key] = json.dumps(task_output, indent=2)
+#             elif hasattr(task_output, "model_dump_json"):
+#                 outputs[key] = task_output.model_dump_json(indent=2)
+#             else:
+#                 outputs[key] = str(task_output)
+#     else:
+#         outputs["step6"] = json.dumps(results_dict, indent=2)
+#     return outputs, results_dict
+
+# # --- Button Logic ---
+# if st.button("Generate Marketing Campaign"):
+#     if not customer_domain or not project_description:
+#         st.error("Please provide both inputs.")
+#     else:
+#         st.subheader("Generating Campaign…")
+#         with st.spinner("Running CrewAI…"):
+#             try:
+#                 step_outputs, final_output = run_crew_ai(customer_domain, project_description)
+#                 st.session_state.full_task_outputs = step_outputs
+#                 st.session_state.final_consolidated_output = final_output
+#                 st.rerun()
+#             except Exception as e:
+#                 st.error("Error occurred while generating campaign.")
+#                 st.exception(e)
+
+# # --- Agent-wise Grouped Output ---
+# if st.session_state.get("full_task_outputs"):
+#     st.markdown("---")
+#     st.header("📦 Agent‑wise Final Output")
+#     final = st.session_state.final_consolidated_output or {}
+
+#     with st.expander("👨‍💼 Lead Market Analyst"):
+#         out1 = st.session_state.full_task_outputs.get("step1")
+#         if out1:
+#             st.subheader("Step 1 Output (Research)")
+#             st.code(out1, language="json")
+#         st.subheader("Research Summary")
+#         st.markdown(final.get("research_summary", "Not available."))
+
+#     with st.expander("👩‍💼 Chief Marketing Strategist"):
+#         out2 = st.session_state.full_task_outputs.get("step2")
+#         if out2:
+#             st.subheader("Step 2 Output (Understanding)")
+#             st.code(out2, language="json")
+#         st.subheader("Project Understanding")
+#         st.markdown(final.get("project_understanding", "Not available."))
+#         out3 = st.session_state.full_task_outputs.get("step3")
+#         if out3:
+#             st.subheader("Step 3 Output (Strategy)")
+#             st.code(out3, language="json")
+#         strat = final.get("marketing_strategy", {})
+#         st.subheader("Marketing Strategy")
+#         if strat:
+#             st.markdown(f"**Name:** {strat.get('name', '')}")
+#             for heading, items in [("Tactics", strat.get("tactics", [])),
+#                                    ("Channels", strat.get("channels", [])),
+#                                    ("KPIs", strat.get("KPIs", []))]:
+#                 st.markdown(f"**{heading}:**")
+#                 for item in items:
+#                     st.markdown(f"- {item}")
+
+#     with st.expander("✍️ Creative Content Creator"):
+#         out4 = st.session_state.full_task_outputs.get("step4")
+#         if out4:
+#             st.subheader("Step 4 Output (Campaign Ideas)")
+#             st.code(out4, language="json")
+#         ci = final.get("campaign_ideas", {})
+#         st.subheader("Final Campaign Ideas")
+#         st.markdown(f"**Title:** {ci.get('title', '')}")
+#         for idea in ci.get("ideas", []):
+#             st.markdown(f"**{idea.get('name', '')}:** {idea.get('description', '')}")
+#         out5 = st.session_state.full_task_outputs.get("step5")
+#         if out5:
+#             st.subheader("Step 5 Output (Copies)")
+#             st.code(out5, language="json")
+#         st.subheader("Final Marketing Copies")
+#         for copy in final.get("marketing_copies", []):
+#             st.markdown(f"**{copy.get('title', '')}**")
+#             st.write(copy.get("body", ""))
+
+#     with st.expander("🎬 Chief Creative Director"):
+#         final = st.session_state.final_consolidated_output or {}
+
+#         st.subheader("✅ Final Creative Content")
+
+#         # Research Summary
+#         st.markdown("### 🧪 Research Summary")
+#         st.markdown(final.get("research_summary", "Not available."))
+
+#         # Project Understanding
+#         st.markdown("### 🧠 Project Understanding")
+#         st.markdown(final.get("project_understanding", "Not available."))
+
+#         # Marketing Strategy
+#         strategy = final.get("marketing_strategy", {})
+#         if strategy:
+#             st.markdown("### 📊 Marketing Strategy")
+#             st.markdown(f"**Name:** {strategy.get('name', '')}")
+
+#             st.markdown("**Tactics:**")
+#             for tactic in strategy.get("tactics", []):
+#                 st.markdown(f"- {tactic}")
+
+#             st.markdown("**Channels:**")
+#             for channel in strategy.get("channels", []):
+#                 st.markdown(f"- {channel}")
+
+#             st.markdown("**KPIs:**")
+#             for kpi in strategy.get("KPIs", []):
+#                 st.markdown(f"- {kpi}")
+
+#         # Campaign Ideas
+#         campaign = final.get("campaign_ideas", {})
+#         if campaign:
+#             st.markdown("### 🎯 Campaign Ideas")
+#             st.markdown(f"**Title:** {campaign.get('title', '')}")
+#             for idea in campaign.get("ideas", []):
+#                 st.markdown(f"#### {idea.get('name', '')}")
+#                 st.markdown(f"- **Description:** {idea.get('description', '')}")
+#                 st.markdown(f"- **Audience:** {idea.get('audience', '')}")
+#                 st.markdown(f"- **Channel:** {idea.get('channel', '')}")
+
+#         # Marketing Copies
+#         copies = final.get("marketing_copies", [])
+#         if copies:
+#             st.markdown("### ✍️ Marketing Copies")
+#             for copy in copies:
+#                 st.markdown(f"#### {copy.get('title', '')}")
+#                 st.markdown(copy.get("body", ""))
+
+# st.markdown("---")
+# st.caption("Powered by CrewAI, OpenAI, Serper & Streamlit")
+
+
+
+
+import streamlit as st
+import os
+import json
+from dotenv import load_dotenv
+from marketing_posts.crew import MarketingPostsCrew
+
+# --- Load API Keys ---
+load_dotenv()
+serper_api_key = os.getenv("SERPER_API_KEY")
+openai_secret_path = "/run/secrets/openai-api-key"
+
+if os.path.exists(openai_secret_path):
+    with open(openai_secret_path, "r") as f:
+        openai_api_key = f.read().strip()
+else:
+    st.error("Missing OpenAI secret file.")
+    st.stop()
+
+os.environ["SERPER_API_KEY"] = serper_api_key or ''
+os.environ["OPENAI_API_KEY"] = openai_api_key or ''
+
+if not serper_api_key or not openai_api_key:
+    st.error("API keys missing. Check .env or Docker secrets.")
+    st.stop()
+
+# --- Streamlit App Config ---
+st.set_page_config(layout="wide", page_title="AI Marketing Studio")
+st.title("AI Marketing Studio")
+st.markdown("---")
+
+# Project input
+customer_domain = st.text_input("🌐 Project Domain (e.g., fintech)")
+project_description = st.text_area("📝 Project Description", height=150)
+
+if 'full_task_outputs' not in st.session_state:
+    st.session_state.full_task_outputs = {}
+    st.session_state.final_consolidated_output = {}
+
+# --- Run CrewAI ---
+@st.cache_data(show_spinner=False)
+def run_crew_ai(domain, desc):
+    inputs = {"customer_domain": domain, "project_description": desc}
+    crew_result = MarketingPostsCrew().crew().kickoff(inputs=inputs)
+    results_dict = crew_result.json_dict if hasattr(crew_result, 'json_dict') else json.loads(str(crew_result))
+    outputs = {}
+    if hasattr(crew_result, 'tasks_output'):
+        for i, task_output in enumerate(crew_result.tasks_output):
+            key = f"step{i+1}"
+            if isinstance(task_output, (dict, list)):
+                outputs[key] = json.dumps(task_output, indent=2)
+            elif hasattr(task_output, "model_dump_json"):
+                outputs[key] = task_output.model_dump_json(indent=2)
+            else:
+                outputs[key] = str(task_output)
+    else:
+        outputs["step6"] = json.dumps(results_dict, indent=2)
+    return outputs, results_dict
+
+# --- Button ---
+if st.button("🚀 Generate Campaign"):
+    if not customer_domain or not project_description:
+        st.error("Please provide both domain and description.")
+    else:
+        with st.spinner("Running CrewAI Agents..."):
+            try:
+                step_outputs, final_output = run_crew_ai(customer_domain, project_description)
+                st.session_state.full_task_outputs = step_outputs
+                st.session_state.final_consolidated_output = final_output
+                st.rerun()
+            except Exception as e:
+                st.error("Something went wrong.")
+                st.exception(e)
+
+# --- Final Output Display ---
+if st.session_state.get("final_consolidated_output"):
+    final = st.session_state["final_consolidated_output"]
+    st.markdown("---")
+    st.header("📦 Agent‑wise Final Output")
+
+    # Step 1: Lead Market Analyst
+    with st.expander("👨‍💼 Lead Market Analyst"):
+        out1 = st.session_state.full_task_outputs.get("step1")
+        text1 = final.get("research_summary", "Not available.")
+        with st.expander("JSON Output"):
+            if out1:
+                st.code(out1, language="json")
+            else:
+                st.write("No JSON output available.")
+        with st.expander("Text Output"):
+            st.markdown(text1)
+
+    # Step 2: Chief Marketing Strategist
+    with st.expander("👩‍💼 Chief Marketing Strategist"):
+        out2 = st.session_state.full_task_outputs.get("step2")
+        text2 = final.get("project_understanding", "Not available.")
+        with st.expander("JSON Output"):
+            if out2:
+                st.code(out2, language="json")
+            else:
+                st.write("No JSON output available.")
+        with st.expander("Text Output"):
+            st.markdown(text2)
+
+        out3 = st.session_state.full_task_outputs.get("step3")
+        text3 = final.get("marketing_strategy", {})
+        with st.expander("Step 3 Output (Strategy) - JSON Output"):
+            if out3:
+                st.code(out3, language="json")
+            else:
+                st.write("No JSON output available.")
+        with st.expander("Step 3 Output (Strategy) - Text Output"):
+            if text3:
+                st.markdown(f"**Name:** {text3.get('name', '')}")
+                st.markdown("**KPIs:**")
+                for kpi in text3.get("KPIs", []):
+                    st.markdown(f"- {kpi}")
+
+                if text3.get("tactic_channel_pairs"):
+                    st.markdown("#### Tactic → Channel → Why This Fits")
+                    for pair in text3["tactic_channel_pairs"]:
+                        st.markdown(f"- **{pair['tactic']}** → **{pair['channel']}**")
+                        st.markdown(f"  • _Why_: {pair['rationale']}")
+            else:
+                st.write("No text output available.")
+
+    # Step 4: Creative Content Creator (No changes here)
+    with st.expander("✍️ Creative Content Creator"):
+        out4 = st.session_state.full_task_outputs.get("step4")
+        if out4:
+            st.subheader("Step 4 Output (Campaign Ideas)")
+            st.code(out4, language="json")
+
+        ci = final.get("campaign_ideas", {})
+        st.subheader("Final Campaign Ideas")
+        if ci:
+            st.markdown(f"**Title:** {ci.get('title', '')}")
+            for idea in ci.get("ideas", []):
+                st.markdown(f"#### {idea.get('name', '')}")
+                st.markdown(f"- **Description:** {idea.get('description', '')}")
+                st.markdown(f"- **Audience:** {idea.get('audience', '')}")
+                st.markdown(f"- **Channel:** {idea.get('channel', '')}")
+                if "tactic_used" in idea:
+                    st.markdown(f"- **Tactic Used:** {idea['tactic_used']}")
+                if "channel_fit" in idea:
+                    st.markdown(f"- **Why this channel fits:** {idea['channel_fit']}")
+
+        out5 = st.session_state.full_task_outputs.get("step5")
+        if out5:
+            st.subheader("Step 5 Output (Copies)")
+            st.code(out5, language="json")
+
+        st.subheader("Final Marketing Copies")
+        for copy in final.get("marketing_copies", []):
+            st.markdown(f"**{copy.get('title', '')}**")
+            st.write(copy.get("body", ""))
+
+        if final.get("refined_marketing_copies"):
+            st.subheader("🏁 Refined Marketing Copies")
+            for c in final["refined_marketing_copies"]:
+                st.markdown(f"#### {c['title']}")
+                st.markdown(c['body'])
+
+    # ... rest of your code unchanged
+
+
+    with st.expander("🎬 Chief Creative Director"):
+        st.subheader("✅ Final Creative Content")
+
+        st.markdown("### 🧪 Research Summary")
+        st.markdown(final.get("research_summary", "Not available."))
+
+        st.markdown("### 🧠 Project Understanding")
+        st.markdown(final.get("project_understanding", "Not available."))
+
+        strategy = final.get("marketing_strategy", {})
+        if strategy:
+            st.markdown("### 📊 Marketing Strategy")
+            st.markdown(f"**Name:** {strategy.get('name', '')}")
+            st.markdown("**KPIs:**")
+            for kpi in strategy.get("KPIs", []):
+                st.markdown(f"- {kpi}")
+
+            if strategy.get("tactic_channel_pairs"):
+                st.markdown("#### Tactic ↔ Channel ↔ Justification")
+                for pair in strategy["tactic_channel_pairs"]:
+                    st.markdown(f"- **{pair['tactic']}** → **{pair['channel']}**")
+                    st.markdown(f"  • _Why_: {pair['rationale']}")
+
+        campaign = final.get("campaign_ideas", {})
+        if campaign:
+            st.markdown("### 🎯 Campaign Ideas")
+            st.markdown(f"**Title:** {campaign.get('title', '')}")
+            for idea in campaign.get("ideas", []):
+                st.markdown(f"#### {idea.get('name', '')}")
+                st.markdown(f"- **Description:** {idea.get('description', '')}")
+                st.markdown(f"- **Audience:** {idea.get('audience', '')}")
+                st.markdown(f"- **Channel:** {idea.get('channel', '')}")
+                if "tactic_used" in idea:
+                    st.markdown(f"- **Tactic Used:** {idea['tactic_used']}")
+                if "channel_fit" in idea:
+                    st.markdown(f"- **Why this channel fits:** {idea['channel_fit']}")
+
+        copies = final.get("marketing_copies", [])
+        if copies:
+            st.markdown("### ✍️ Marketing Copies")
+            for copy in copies:
+                st.markdown(f"#### {copy.get('title', '')}")
+                st.markdown(copy.get("body", ""))
+
+        refined = final.get("refined_marketing_copies", [])
+        if refined:
+            st.markdown("### 🏁 Refined Marketing Copies")
+            for c in refined:
+                st.markdown(f"#### {c['title']}")
+                st.markdown(c['body'])
+
+        competitors = final.get("competitor_analysis")
+        if competitors:
+            st.markdown("### 🕵️ Competitor Analysis")
+            st.markdown(competitors)
+
+    
+
+from io import BytesIO
+from reportlab.lib.pagesizes import letter
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+
+# PDF Generator for Chief Creative Director section only
+def generate_director_pdf(final):
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=30, leftMargin=30, topMargin=30, bottomMargin=18)
+    styles = getSampleStyleSheet()
+    styles.add(ParagraphStyle(name='CustomHeading1', fontSize=18, leading=22, spaceAfter=14))
+    styles.add(ParagraphStyle(name='CustomHeading2', fontSize=14, leading=18, spaceAfter=10))
+    styles.add(ParagraphStyle(name='CustomBodyText', fontSize=11, leading=14))
+
+    elements = []
+
+    def add_section(title, content):
+        elements.append(Paragraph(title, styles['CustomHeading1']))
+        if isinstance(content, list):
+            for item in content:
+                if isinstance(item, dict):
+                    for k, v in item.items():
+                        elements.append(Paragraph(f"<b>{k}:</b> {v}", styles['CustomBodyText']))
+                    elements.append(Spacer(1, 6))
+                else:
+                    elements.append(Paragraph(str(item), styles['CustomBodyText']))
+        elif isinstance(content, dict):
+            for k, v in content.items():
+                if isinstance(v, list):
+                    elements.append(Paragraph(f"<b>{k}:</b>", styles['CustomHeading2']))
+                    for i in v:
+                        elements.append(Paragraph(str(i), styles['CustomBodyText']))
+                else:
+                    elements.append(Paragraph(f"<b>{k}:</b> {v}", styles['CustomBodyText']))
+        elif isinstance(content, str):
+            elements.append(Paragraph(content.replace('\n', '<br />'), styles['CustomBodyText']))
+        elements.append(Spacer(1, 12))
+
+    add_section("🧪 Research Summary", final.get("research_summary"))
+    add_section("🧠 Project Understanding", final.get("project_understanding"))
+
+    strategy = final.get("marketing_strategy", {})
+    if strategy:
+        elements.append(Paragraph("📊 Marketing Strategy", styles['CustomHeading1']))
+        elements.append(Paragraph(f"<b>Name:</b> {strategy.get('name', '')}", styles['CustomBodyText']))
+        elements.append(Paragraph("<b>KPIs:</b>", styles['CustomHeading2']))
+        for kpi in strategy.get("KPIs", []):
+            elements.append(Paragraph(f"- {kpi}", styles['CustomBodyText']))
+        elements.append(Paragraph("<b>Tactic → Channel → Why:</b>", styles['CustomHeading2']))
+        for pair in strategy.get("tactic_channel_pairs", []):
+            elements.append(Paragraph(f"• {pair['tactic']} → {pair['channel']}<br/><i>Why:</i> {pair['rationale']}", styles['CustomBodyText']))
+        elements.append(Spacer(1, 12))
+
+    campaign = final.get("campaign_ideas", {})
+    if campaign:
+        elements.append(Paragraph("🎯 Campaign Ideas", styles['CustomHeading1']))
+        elements.append(Paragraph(f"<b>Title:</b> {campaign.get('title', '')}", styles['CustomBodyText']))
+        for idea in campaign.get("ideas", []):
+            elements.append(Paragraph(f"<b>{idea.get('name', '')}</b>", styles['CustomHeading2']))
+            elements.append(Paragraph(f"- Description: {idea.get('description', '')}", styles['CustomBodyText']))
+            elements.append(Paragraph(f"- Audience: {idea.get('audience', '')}", styles['CustomBodyText']))
+            elements.append(Paragraph(f"- Channel: {idea.get('channel', '')}", styles['CustomBodyText']))
+            if "tactic_used" in idea:
+                elements.append(Paragraph(f"- Tactic Used: {idea['tactic_used']}", styles['CustomBodyText']))
+            if "channel_fit" in idea:
+                elements.append(Paragraph(f"- Channel Fit: {idea['channel_fit']}", styles['CustomBodyText']))
+            elements.append(Spacer(1, 6))
+
+    copies = final.get("marketing_copies", [])
+    if copies:
+        elements.append(Paragraph("✍️ Marketing Copies", styles['CustomHeading1']))
+        for copy in copies:
+            elements.append(Paragraph(f"{copy.get('title', '')}", styles['CustomHeading2']))
+            elements.append(Paragraph(copy.get("body", ""), styles['CustomBodyText']))
+
+    refined = final.get("refined_marketing_copies", [])
+    if refined:
+        elements.append(Paragraph("🏁 Refined Marketing Copies", styles['CustomHeading1']))
+        for c in refined:
+            elements.append(Paragraph(c['title'], styles['CustomHeading2']))
+            elements.append(Paragraph(c['body'], styles['CustomBodyText']))
+
+    competitors = final.get("competitor_analysis")
+    if competitors:
+        elements.append(Paragraph("🕵️ Competitor Analysis", styles['CustomHeading1']))
+        elements.append(Paragraph(competitors.replace('\n', '<br />'), styles['CustomBodyText']))
+
+    doc.build(elements)
+    pdf = buffer.getvalue()
+    buffer.close()
+    return pdf
+
+# -- Show PDF Download Button (only if final is present) --
+if st.session_state.get("final_consolidated_output"):
+    pdf = generate_director_pdf(st.session_state["final_consolidated_output"])
+    st.download_button(
+        label="📥 Download Final Report (Chief Creative Director PDF)",
+        data=pdf,
+        file_name="final_creative_director_report.pdf",
+        mime="application/pdf"
+    )
+
+
+
+# --- Footer ---
+st.markdown("---")
+st.caption("Powered by CrewAI, OpenAI, Serper & Streamlit")
+
+
+
+
+
+
+# import streamlit as st
+# import os
+# import json
+# from dotenv import load_dotenv
+# from marketing_posts.crew import MarketingPostsCrew
+# from io import BytesIO
+# from reportlab.lib.pagesizes import letter
+# from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+# from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+
+# # --- Load API Keys ---
+# load_dotenv()
+# serper_api_key = os.getenv("SERPER_API_KEY")
+# openai_secret_path = "/run/secrets/openai-api-key"
+
+# if os.path.exists(openai_secret_path):
+#     with open(openai_secret_path, "r") as f:
+#         openai_api_key = f.read().strip()
+# else:
+#     st.error("Missing OpenAI secret file.")
+#     st.stop()
+
+# os.environ["SERPER_API_KEY"] = serper_api_key or ''
+# os.environ["OPENAI_API_KEY"] = openai_api_key or ''
+
+# if not serper_api_key or not openai_api_key:
+#     st.error("API keys missing. Check .env or Docker secrets.")
+#     st.stop()
+
+# # --- Streamlit App Config ---
+# st.set_page_config(layout="wide", page_title="AI Marketing Studio")
+# st.title("AI Marketing Studio")
+# st.markdown("---")
+
+# # Project input
+# customer_domain = st.text_input("🌐 Project Domain (e.g., fintech)")
+# project_description = st.text_area("📝 Project Description", height=150)
+
+# if 'full_task_outputs' not in st.session_state:
+#     st.session_state.full_task_outputs = {}
+#     st.session_state.final_consolidated_output = {}
+
+# # --- Run CrewAI ---
+# @st.cache_data(show_spinner=False)
+# def run_crew_ai(domain, desc):
+#     inputs = {"customer_domain": domain, "project_description": desc}
+#     crew_result = MarketingPostsCrew().crew().kickoff(inputs=inputs)
+#     results_dict = crew_result.json_dict if hasattr(crew_result, 'json_dict') else json.loads(str(crew_result))
+#     outputs = {}
+#     if hasattr(crew_result, 'tasks_output'):
+#         for i, task_output in enumerate(crew_result.tasks_output):
+#             key = f"step{i+1}"
+#             if isinstance(task_output, (dict, list)):
+#                 outputs[key] = json.dumps(task_output, indent=2)
+#             elif hasattr(task_output, "model_dump_json"):
+#                 outputs[key] = task_output.model_dump_json(indent=2)
+#             else:
+#                 outputs[key] = str(task_output)
+#     else:
+#         outputs["step6"] = json.dumps(results_dict, indent=2)
+#     return outputs, results_dict
+
+# # --- PDF Generation Function ---
+# def generate_pdf(final_output):
+#     buffer = BytesIO()
+#     doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=30, leftMargin=30, topMargin=30, bottomMargin=18)
+#     styles = getSampleStyleSheet()
+#     styles.add(ParagraphStyle(name='CustomHeading1', fontSize=18, leading=22, spaceAfter=14, spaceBefore=14))
+#     styles.add(ParagraphStyle(name='CustomHeading2', fontSize=14, leading=18, spaceAfter=10, spaceBefore=10))
+#     styles.add(ParagraphStyle(name='CustomBodyText', fontSize=11, leading=14))
+
+#     elements = []
+
+#     def add_section(title, content):
+#         if content:
+#             elements.append(Paragraph(title, styles['Heading1']))
+#             if isinstance(content, dict):
+#                 for k, v in content.items():
+#                     if isinstance(v, (list, dict)):
+#                         elements.append(Paragraph(f"<b>{k}:</b>", styles['Heading2']))
+#                         if isinstance(v, list):
+#                             for item in v:
+#                                 if isinstance(item, dict):
+#                                     for ik, iv in item.items():
+#                                         elements.append(Paragraph(f"{ik}: {iv}", styles['BodyText']))
+#                                     elements.append(Spacer(1, 6))
+#                                 else:
+#                                     elements.append(Paragraph(str(item), styles['BodyText']))
+#                         elif isinstance(v, dict):
+#                             for dk, dv in v.items():
+#                                 elements.append(Paragraph(f"{dk}: {dv}", styles['BodyText']))
+#                     else:
+#                         elements.append(Paragraph(f"<b>{k}:</b> {v}", styles['BodyText']))
+#                     elements.append(Spacer(1, 8))
+#             else:
+#                 elements.append(Paragraph(str(content).replace('\n', '<br />'), styles['BodyText']))
+#             elements.append(Spacer(1, 12))
+
+#     # Add main sections from the final output:
+#     add_section("Research Summary", final_output.get("research_summary"))
+#     add_section("Project Understanding", final_output.get("project_understanding"))
+#     add_section("Marketing Strategy", final_output.get("marketing_strategy"))
+#     add_section("Campaign Ideas", final_output.get("campaign_ideas"))
+#     add_section("Marketing Copies", final_output.get("marketing_copies"))
+#     add_section("Refined Marketing Copies", final_output.get("refined_marketing_copies"))
+#     add_section("Competitor Analysis", final_output.get("competitor_analysis"))
+
+#     doc.build(elements)
+#     pdf = buffer.getvalue()
+#     buffer.close()
+#     return pdf
+
+
+# # --- Button ---
+# if st.button("🚀 Generate Campaign"):
+#     if not customer_domain or not project_description:
+#         st.error("Please provide both domain and description.")
+#     else:
+#         with st.spinner("Running CrewAI Agents..."):
+#             try:
+#                 step_outputs, final_output = run_crew_ai(customer_domain, project_description)
+#                 st.session_state.full_task_outputs = step_outputs
+#                 st.session_state.final_consolidated_output = final_output
+#                 st.rerun()
+#             except Exception as e:
+#                 st.error("Something went wrong.")
+#                 st.exception(e)
+
+# # --- Final Output Display ---
+# if st.session_state.get("final_consolidated_output"):
+#     final = st.session_state["final_consolidated_output"]
+#     st.markdown("---")
+#     st.header("📦 Agent‑wise Final Output")
+
+#     with st.expander("👨‍💼 Lead Market Analyst"):
+#         out1 = st.session_state.full_task_outputs.get("step1")
+#         if out1:
+#             st.subheader("Step 1 Output (Research)")
+#             st.code(out1, language="json")
+#         st.subheader("Research Summary")
+#         st.markdown(final.get("research_summary", "Not available."))
+
+#     with st.expander("👩‍💼 Chief Marketing Strategist"):
+#         out2 = st.session_state.full_task_outputs.get("step2")
+#         if out2:
+#             st.subheader("Step 2 Output (Understanding)")
+#             st.code(out2, language="json")
+#         st.subheader("Project Understanding")
+#         st.markdown(final.get("project_understanding", "Not available."))
+
+#         out3 = st.session_state.full_task_outputs.get("step3")
+#         if out3:
+#             st.subheader("Step 3 Output (Strategy)")
+#             st.code(out3, language="json")
+
+#         strat = final.get("marketing_strategy", {})
+#         st.subheader("Marketing Strategy")
+#         if strat:
+#             st.markdown(f"**Name:** {strat.get('name', '')}")
+#             st.markdown("**KPIs:**")
+#             for kpi in strat.get("KPIs", []):
+#                 st.markdown(f"- {kpi}")
+
+#             if strat.get("tactic_channel_pairs"):
+#                 st.markdown("#### Tactic → Channel → Why This Fits")
+#                 for pair in strat["tactic_channel_pairs"]:
+#                     st.markdown(f"- **{pair['tactic']}** → **{pair['channel']}**")
+#                     st.markdown(f"  • _Why_: {pair['rationale']}")
+
+#     with st.expander("✍️ Creative Content Creator"):
+#         out4 = st.session_state.full_task_outputs.get("step4")
+#         if out4:
+#             st.subheader("Step 4 Output (Campaign Ideas)")
+#             st.code(out4, language="json")
+
+#         ci = final.get("campaign_ideas", {})
+#         st.subheader("Final Campaign Ideas")
+#         if ci:
+#             st.markdown(f"**Title:** {ci.get('title', '')}")
+#             for idea in ci.get("ideas", []):
+#                 st.markdown(f"#### {idea.get('name', '')}")
+#                 st.markdown(f"- **Description:** {idea.get('description', '')}")
+#                 st.markdown(f"- **Audience:** {idea.get('audience', '')}")
+#                 st.markdown(f"- **Channel:** {idea.get('channel', '')}")
+#                 if "tactic_used" in idea:
+#                     st.markdown(f"- **Tactic Used:** {idea['tactic_used']}")
+#                 if "channel_fit" in idea:
+#                     st.markdown(f"- **Why this channel fits:** {idea['channel_fit']}")
+
+#         out5 = st.session_state.full_task_outputs.get("step5")
+#         if out5:
+#             st.subheader("Step 5 Output (Copies)")
+#             st.code(out5, language="json")
+
+#         st.subheader("Final Marketing Copies")
+#         for copy in final.get("marketing_copies", []):
+#             st.markdown(f"**{copy.get('title', '')}**")
+#             st.write(copy.get("body", ""))
+
+#         if final.get("refined_marketing_copies"):
+#             st.subheader("🏁 Refined Marketing Copies")
+#             for c in final["refined_marketing_copies"]:
+#                 st.markdown(f"#### {c['title']}")
+#                 st.markdown(c['body'])
+
+#     with st.expander("🎬 Chief Creative Director"):
+#         st.subheader("✅ Final Creative Content")
+
+#         st.markdown("### 🧪 Research Summary")
+#         st.markdown(final.get("research_summary", "Not available."))
+
+#         st.markdown("### 🧠 Project Understanding")
+#         st.markdown(final.get("project_understanding", "Not available."))
+
+#         strategy = final.get("marketing_strategy", {})
+#         if strategy:
+#             st.markdown("### 📊 Marketing Strategy")
+#             st.markdown(f"**Name:** {strategy.get('name', '')}")
+#             st.markdown("**KPIs:**")
+#             for kpi in strategy.get("KPIs", []):
+#                 st.markdown(f"- {kpi}")
+
+#             if strategy.get("tactic_channel_pairs"):
+#                 st.markdown("#### Tactic ↔ Channel ↔ Justification")
+#                 for pair in strategy["tactic_channel_pairs"]:
+#                     st.markdown(f"- **{pair['tactic']}** → **{pair['channel']}**")
+#                     st.markdown(f"  • _Why_: {pair['rationale']}")
+
+#         campaign = final.get("campaign_ideas", {})
+#         if campaign:
+#             st.markdown("### 🎯 Campaign Ideas")
+#             st.markdown(f"**Title:** {campaign.get('title', '')}")
+#             for idea in campaign.get("ideas", []):
+#                 st.markdown(f"#### {idea.get('name', '')}")
+#                 st.markdown(f"- **Description:** {idea.get('description', '')}")
+#                 st.markdown(f"- **Audience:** {idea.get('audience', '')}")
+#                 st.markdown(f"- **Channel:** {idea.get('channel', '')}")
+#                 if "tactic_used" in idea:
+#                     st.markdown(f"- **Tactic Used:** {idea['tactic_used']}")
+#                 if "channel_fit" in idea:
+#                     st.markdown(f"- **Why this channel fits:** {idea['channel_fit']}")
+
+#         copies = final.get("marketing_copies", [])
+#         if copies:
+#             st.markdown("### ✍️ Marketing Copies")
+#             for copy in copies:
+#                 st.markdown(f"#### {copy.get('title', '')}")
+#                 st.markdown(copy.get("body", ""))
+
+#         refined = final.get("refined_marketing_copies", [])
+#         if refined:
+#             st.markdown("### 🏁 Refined Marketing Copies")
+#             for c in refined:
+#                 st.markdown(f"#### {c['title']}")
+#                 st.markdown(c['body'])
+
+#         competitors = final.get("competitor_analysis")
+#         if competitors:
+#             st.markdown("### 🕵️ Competitor Analysis")
+#             st.markdown(competitors)
+
+#     # --- PDF Download Button ---
+#     pdf_data = generate_pdf(final)
+#     st.download_button(
+#         label="📥 Download Final Report (PDF)",
+#         data=pdf_data,
+#         file_name="final_marketing_report.pdf",
+#         mime="application/pdf"
+#     )
+
+# # --- Footer ---
+# st.markdown("---")
+# st.caption("Powered by CrewAI, OpenAI, Serper & Streamlit")
+
+
+
+
+
+# code without step wise output -just final pdf
+
+# import streamlit as st
+# import os
+# import json
+# from dotenv import load_dotenv
+# from marketing_posts.crew import MarketingPostsCrew
+# from io import BytesIO
+# from reportlab.lib.pagesizes import letter
+# from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+# from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+
+# # --- Load API Keys ---
+# load_dotenv()
+# serper_api_key = os.getenv("SERPER_API_KEY")
+# openai_secret_path = "/run/secrets/openai-api-key"
+
+# if os.path.exists(openai_secret_path):
+#     with open(openai_secret_path, "r") as f:
+#         openai_api_key = f.read().strip()
+# else:
+#     st.error("Missing OpenAI secret file.")
+#     st.stop()
+
+# os.environ["SERPER_API_KEY"] = serper_api_key or ''
+# os.environ["OPENAI_API_KEY"] = openai_api_key or ''
+
+# if not serper_api_key or not openai_api_key:
+#     st.error("API keys missing. Check .env or Docker secrets.")
+#     st.stop()
+
+# # --- Streamlit App Config ---
+# st.set_page_config(layout="wide", page_title="AI Marketing Studio")
+# st.title("AI Marketing Studio")
+# st.markdown("---")
+
+# # Project input
+# customer_domain = st.text_input("🌐 Project Domain (e.g., fintech)")
+# project_description = st.text_area("📝 Project Description", height=150)
+
+# if 'full_task_outputs' not in st.session_state:
+#     st.session_state.full_task_outputs = {}
+#     st.session_state.final_consolidated_output = {}
+
+# # --- Run CrewAI ---
+# @st.cache_data(show_spinner=False)
+# def run_crew_ai(domain, desc):
+#     inputs = {"customer_domain": domain, "project_description": desc}
+#     crew_result = MarketingPostsCrew().crew().kickoff(inputs=inputs)
+#     results_dict = crew_result.json_dict if hasattr(crew_result, 'json_dict') else json.loads(str(crew_result))
+#     outputs = {}
+#     if hasattr(crew_result, 'tasks_output'):
+#         for i, task_output in enumerate(crew_result.tasks_output):
+#             key = f"step{i+1}"
+#             if isinstance(task_output, (dict, list)):
+#                 outputs[key] = json.dumps(task_output, indent=2)
+#             elif hasattr(task_output, "model_dump_json"):
+#                 outputs[key] = task_output.model_dump_json(indent=2)
+#             else:
+#                 outputs[key] = str(task_output)
+#     else:
+#         outputs["step6"] = json.dumps(results_dict, indent=2)
+#     return outputs, results_dict
+
+# # --- PDF Generation Function ---
+# def generate_pdf(final_output):
+#     buffer = BytesIO()
+#     doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=30, leftMargin=30, topMargin=30, bottomMargin=18)
+#     styles = getSampleStyleSheet()
+
+#     # Define custom styles to avoid conflicts
+#     styles.add(ParagraphStyle(name='CustomHeading1', fontSize=18, leading=22, spaceAfter=14, spaceBefore=14))
+#     styles.add(ParagraphStyle(name='CustomHeading2', fontSize=14, leading=18, spaceAfter=10, spaceBefore=10))
+#     styles.add(ParagraphStyle(name='CustomBodyText', fontSize=11, leading=14))
+
+#     elements = []
+
+#     def add_section(title, content):
+#         if content:
+#             elements.append(Paragraph(title, styles['CustomHeading1']))
+#             if isinstance(content, dict):
+#                 for k, v in content.items():
+#                     if isinstance(v, (list, dict)):
+#                         elements.append(Paragraph(f"<b>{k}:</b>", styles['CustomHeading2']))
+#                         if isinstance(v, list):
+#                             for item in v:
+#                                 if isinstance(item, dict):
+#                                     for ik, iv in item.items():
+#                                         elements.append(Paragraph(f"{ik}: {iv}", styles['CustomBodyText']))
+#                                     elements.append(Spacer(1, 6))
+#                                 else:
+#                                     elements.append(Paragraph(str(item), styles['CustomBodyText']))
+#                         elif isinstance(v, dict):
+#                             for dk, dv in v.items():
+#                                 elements.append(Paragraph(f"{dk}: {dv}", styles['CustomBodyText']))
+#                     else:
+#                         elements.append(Paragraph(f"<b>{k}:</b> {v}", styles['CustomBodyText']))
+#                     elements.append(Spacer(1, 8))
+#             else:
+#                 elements.append(Paragraph(str(content).replace('\n', '<br />'), styles['CustomBodyText']))
+#             elements.append(Spacer(1, 12))
+
+#     add_section("Research Summary", final_output.get("research_summary"))
+#     add_section("Project Understanding", final_output.get("project_understanding"))
+#     add_section("Marketing Strategy", final_output.get("marketing_strategy"))
+#     add_section("Campaign Ideas", final_output.get("campaign_ideas"))
+#     add_section("Marketing Copies", final_output.get("marketing_copies"))
+#     add_section("Refined Marketing Copies", final_output.get("refined_marketing_copies"))
+#     add_section("Competitor Analysis", final_output.get("competitor_analysis"))
+
+#     doc.build(elements)
+#     pdf = buffer.getvalue()
+#     buffer.close()
+#     return pdf
+
+# # --- Button ---
+# if st.button("🚀 Generate Campaign"):
+#     if not customer_domain or not project_description:
+#         st.error("Please provide both domain and description.")
+#     else:
+#         with st.spinner("Running CrewAI Agents..."):
+#             try:
+#                 step_outputs, final_output = run_crew_ai(customer_domain, project_description)
+#                 st.session_state.full_task_outputs = step_outputs
+#                 st.session_state.final_consolidated_output = final_output
+#                 st.rerun()
+#             except Exception as e:
+#                 st.error("Something went wrong.")
+#                 st.exception(e)
+
+# # --- Final Output Display ---
+# if st.session_state.get("final_consolidated_output"):
+#     final = st.session_state["final_consolidated_output"]
+#     st.markdown("---")
+#     st.header("📦 Agent‑wise Final Output")
+
+#     # EXPANDERS OMITTED FOR BREVITY (you already have them fully working)
+
+#     # --- PDF Download Button ---
+#     pdf_data = generate_pdf(final)
+#     st.download_button(
+#         label="📥 Download Final Report (PDF)",
+#         data=pdf_data,
+#         file_name="final_marketing_report.pdf",
+#         mime="application/pdf"
+#     )
+
+# # --- Footer ---
+# st.markdown("---")
+# st.caption("Powered by CrewAI, OpenAI, Serper & Streamlit")
+
+
+
+

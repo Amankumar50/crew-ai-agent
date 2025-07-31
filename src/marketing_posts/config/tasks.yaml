@@ -1,42 +1,125 @@
 research_task:
   description: >
     Conduct a thorough research about the customer and competitors in the context
-    of {customer_domain}.
-    Make sure you find any interesting and relevant information given the
-    current year is 2024.
-    We are working with them on the following project: {project_description}.
+    of {customer_domain}. Include demographics, preferences, recent campaigns.
   expected_output: >
-    A complete report on the customer and their customers and competitors,
-    including their demographics, preferences, market positioning and audience engagement.
+    A detailed research summary covering market trends, target audience preferences, and competitor landscape.
 
 project_understanding_task:
   description: >
-    Understand the project details and the target audience for
-    {project_description}.
-    Review any provided materials and gather additional information as needed.
+    Understand the project details and the target audience for {project_description}.
   expected_output: >
-    A detailed summary of the project and a profile of the target audience.
+    Clear summary of project scope, target persona, and objectives.
 
 marketing_strategy_task:
   description: >
-    Formulate a comprehensive marketing strategy for the project
-    {project_description} of the customer {customer_domain}.
-    Use the insights from the research task and the project understanding
-    task to create a high-quality strategy.
+    Formulate a comprehensive marketing strategy. Link each tactic to a specific channel,
+    and explain why that pairing is effective.
   expected_output: >
-    A detailed marketing strategy document that outlines the goals, target
-    audience, key messages, and proposed tactics, make sure to have name, tactics, channels and KPIs
+    A strategy containing:
+      - name
+      - 3 tactic-channel-rationale mappings
+      - KPIs
+
+competitor_analysis_task:
+  description: >
+    Analyze top competitors in the domain {customer_domain}. Identify recent products,
+    campaigns, news from 2024, and actionable lessons or counter-ideas.
+  expected_output: >
+    Competitor insights including key launches and recommendations to counter or adopt.
 
 campaign_idea_task:
   description: >
-    Develop creative marketing campaign ideas for {project_description}.
-    Ensure the ideas are innovative, engaging, and aligned with the overall marketing strategy.
+    Develop creative campaign ideas aligned with the refined marketing strategy.
   expected_output: >
-    A list of 5 campaign ideas, each with a brief description and expected impact.
+    3–5 campaign ideas, each with a theme, description, audience, and channel.
 
 copy_creation_task:
   description: >
-    Create marketing copies based on the approved campaign ideas for {project_description}.
-    Ensure the copies are compelling, clear, and tailored to the target audience.
+    Write marketing copies for each campaign idea, tailored to target audience and strategy tone.
   expected_output: >
-    Marketing copies for each campaign idea.
+    Title and body for each campaign idea.
+
+message_refinement_task:
+  description: >
+    Refine existing marketing copies using the intended tactic, channel, audience, and brand tone.
+  expected_output: >
+    Refined copies that improve clarity, persuasion, and alignment.
+
+consolidate_output_task:
+  description: >
+    Consolidate all outputs (research, understanding, strategy, campaign ideas, copies,
+    refined copies, competitor insights) into a structured JSON.
+  expected_output: >
+    JSON with keys:
+      - research_summary
+      - project_understanding
+      - marketing_strategy
+      - campaign_ideas
+      - marketing_copies
+      - refined_marketing_copies
+      - competitor_analysis
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# Old Code 
+# research_task:
+#   description: >
+#     Conduct a thorough research about the customer and competitors in the context
+#     of {customer_domain}.
+#     Make sure you find any interesting and relevant information given the
+#     current year is 2024.
+#     We are working with them on the following project: {project_description}.
+#   expected_output: >
+#     A complete report on the customer and their customers and competitors,
+#     including their demographics, preferences, market positioning and audience engagement.
+
+# project_understanding_task:
+#   description: >
+#     Understand the project details and the target audience for
+#     {project_description}.
+#     Review any provided materials and gather additional information as needed.
+#   expected_output: >
+#     A detailed summary of the project and a profile of the target audience.
+
+# marketing_strategy_task:
+#   description: >
+#     Formulate a comprehensive marketing strategy for the project
+#     {project_description} of the customer {customer_domain}.
+#     Use the insights from the research task and the project understanding
+#     task to create a high-quality strategy.
+#   expected_output: >
+#     A detailed marketing strategy document that outlines the goals, target
+#     audience, key messages, and proposed tactics, make sure to have name, tactics, channels and KPIs
+
+# campaign_idea_task:
+#   description: >
+#     Develop creative marketing campaign ideas for {project_description}.
+#     Ensure the ideas are innovative, engaging, and aligned with the overall marketing strategy.
+#   expected_output: >
+#     A list of 5 campaign ideas, each with a brief description and expected impact.
+
+# copy_creation_task:
+#   description: >
+#     Create marketing copies based on the approved campaign ideas for {project_description}.
+#     Ensure the copies are compelling, clear, and tailored to the target audience.
+#   expected_output: >
+#     Marketing copies for each campaign idea.

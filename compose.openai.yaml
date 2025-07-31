@@ -120,7 +120,8 @@ version: '3.9'
 
 services:
   agents:
-    build: . # Build context is the current directory (crew-ai/)
+    # build: . # Build context is the current directory (crew-ai/)
+    image: crew-ai-agent-agents
     env_file:
       - .env # Load variables from .env in the project root
     environment:
@@ -130,7 +131,7 @@ services:
     command: poetry run streamlit run src/marketing_posts/streamlit_app.py --server.port 8000 --server.address 0.0.0.0
 
     ports:
-      - "8000:8000" # Map container port 8000 to host port 8000 for Streamlit UI
+      - "8001:8000" # Map container port 8000 to host port 8000 for Streamlit UI
     secrets:
       - openai-api-key
     volumes:

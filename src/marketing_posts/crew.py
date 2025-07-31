@@ -502,24 +502,341 @@
 
 
 
+# import logging
+# from typing import List
+# from pydantic import BaseModel
+# from crewai import Agent, Crew, Process, Task
+# from crewai.project import CrewBase, agent, crew, task
+# from .tools import get_tools
+
+# # Suppress verbose logs
+# logging.getLogger("LiteLLM").setLevel(logging.WARNING)
+
+# class MarketStrategy(BaseModel):
+#     name: str
+#     tactic_channel_pairs: List[dict]  # each dict: tactic, channel, rationale
+#     KPIs: List[str]
+
+# class CampaignIdea(BaseModel):
+#     name: str
+#     description: str
+#     audience: str
+#     channel: str
+
+# class CampaignIdeas(BaseModel):
+#     title: str
+#     ideas: List[CampaignIdea]
+
+# class Copy(BaseModel):
+#     title: str
+#     body: str
+
+# class CopyList(BaseModel):
+#     copies: List[Copy]
+
+# class ResearchOutput(BaseModel):
+#     research_summary: str
+
+# class ProjectUnderstandingOutput(BaseModel):
+#     project_understanding: str
+
+# class ConsolidatedOutput(BaseModel):
+#     research_summary: str
+#     project_understanding: str
+#     marketing_strategy: MarketStrategy
+#     campaign_ideas: CampaignIdeas
+#     marketing_copies: List[Copy]
+#     refined_marketing_copies: List[Copy] = []
+#     competitor_analysis: str = ""
+
+# @CrewBase
+# class MarketingPostsCrew:
+#     agents_config = "config/agents.yaml"
+#     tasks_config = "config/tasks.yaml"
+
+#     @agent
+#     def lead_market_analyst(self) -> Agent:
+#         return Agent(config=self.agents_config["lead_market_analyst"], tools=get_tools(), verbose=True)
+
+#     @agent
+#     def competitor_analyst(self) -> Agent:
+#         return Agent(config=self.agents_config["competitor_analyst"], tools=get_tools(), verbose=True)
+
+#     @agent
+#     def chief_marketing_strategist(self) -> Agent:
+#         return Agent(config=self.agents_config["chief_marketing_strategist"], tools=get_tools(), verbose=True)
+
+#     @agent
+#     def creative_content_creator(self) -> Agent:
+#         return Agent(config=self.agents_config["creative_content_creator"], verbose=True)
+
+#     @agent
+#     def message_refiner(self) -> Agent:
+#         return Agent(config=self.agents_config["message_refiner"], verbose=True)
+
+#     @agent
+#     def chief_creative_director(self) -> Agent:
+#         return Agent(config=self.agents_config["chief_creative_director"], verbose=True)
+
+#     @task
+#     def research_task(self) -> Task:
+#         return Task(config=self.tasks_config["research_task"],
+#                     agent=self.lead_market_analyst(),
+#                     output_json=ResearchOutput)
+
+#     @task
+#     def project_understanding_task(self) -> Task:
+#         return Task(config=self.tasks_config["project_understanding_task"],
+#                     agent=self.chief_marketing_strategist(),
+#                     output_json=ProjectUnderstandingOutput)
+
+#     @task
+#     def marketing_strategy_task(self) -> Task:
+#         return Task(config=self.tasks_config["marketing_strategy_task"],
+#                     agent=self.chief_marketing_strategist(),
+#                     context=[self.research_task(), self.project_understanding_task()],
+#                     output_json=MarketStrategy)
+
+#     @task
+#     def competitor_analysis_task(self) -> Task:
+#         return Task(config=self.tasks_config["competitor_analysis_task"],
+#                     agent=self.competitor_analyst(),
+#                     context=[self.research_task()],
+#                     output_json=ResearchOutput)
+
+#     @task
+#     def campaign_idea_task(self) -> Task:
+#         return Task(config=self.tasks_config["campaign_idea_task"],
+#                     agent=self.creative_content_creator(),
+#                     context=[self.marketing_strategy_task()],
+#                     output_json=CampaignIdeas)
+
+#     @task
+#     def copy_creation_task(self) -> Task:
+#         return Task(config=self.tasks_config["copy_creation_task"],
+#                     agent=self.creative_content_creator(),
+#                     context=[self.campaign_idea_task(), self.marketing_strategy_task()],
+#                     output_json=CopyList)
+
+#     @task
+#     def message_refinement_task(self) -> Task:
+#         return Task(config=self.tasks_config["message_refinement_task"],
+#                     agent=self.message_refiner(),
+#                     context=[self.copy_creation_task(), self.marketing_strategy_task()],
+#                     output_json=CopyList)
+
+#     @task
+#     def consolidate_output_task(self) -> Task:
+#         ctx = [
+#             self.research_task(),
+#             self.project_understanding_task(),
+#             self.marketing_strategy_task(),
+#             self.competitor_analysis_task(),
+#             self.campaign_idea_task(),
+#             self.copy_creation_task(),
+#             self.message_refinement_task()
+#         ]
+#         return Task(config=self.tasks_config["consolidate_output_task"],
+#                     agent=self.chief_creative_director(),
+#                     context=ctx,
+#                     output_json=ConsolidatedOutput,
+#                     human_input=False,
+#                     description="Consolidated final output including refined copies and competitor insights.")
+
+#     @crew
+#     def crew(self) -> Crew:
+#         return Crew(agents=self.agents,
+#                     tasks=[
+#                         self.research_task(),
+#                         self.project_understanding_task(),
+#                         self.marketing_strategy_task(),
+#                         self.competitor_analysis_task(),
+#                         self.campaign_idea_task(),
+#                         self.copy_creation_task(),
+#                         self.message_refinement_task(),
+#                         self.consolidate_output_task()
+#                     ],
+#                     process=Process.sequential,
+#                     verbose=True)
+
+# import logging
+# from typing import List, Dict
+# from pydantic import BaseModel
+# from crewai import Agent, Crew, Process, Task
+# from crewai.project import CrewBase, agent, crew, task
+# from .tools import get_tools
+
+# # Suppress verbose logs
+# logging.getLogger("LiteLLM").setLevel(logging.WARNING)
+
+# class MarketStrategy(BaseModel):
+#     name: str
+#     tactic_channel_pairs: List[Dict[str, str]]  # tactic, channel, rationale
+#     KPIs: List[str]
+
+# class CampaignIdea(BaseModel):
+#     name: str
+#     description: str
+#     audience: str
+#     channel: str
+#     tactic_used: str
+#     why_channel_fits: str
+
+# class CampaignIdeas(BaseModel):
+#     title: str
+#     ideas: List[CampaignIdea]
+
+# class Copy(BaseModel):
+#     title: str
+#     body: str
+
+# class CopyList(BaseModel):
+#     copies: List[Copy]
+
+# class ResearchOutput(BaseModel):
+#     research_summary: str
+
+# class ProjectUnderstandingOutput(BaseModel):
+#     project_understanding: str
+
+# class TacticChannelMapEntry(BaseModel):
+#     tactic: str
+#     channel: str
+#     justification: str
+
+# class ConsolidatedOutput(BaseModel):
+#     research_summary: str
+#     project_understanding: str
+#     marketing_strategy: MarketStrategy
+#     campaign_ideas: CampaignIdeas
+#     marketing_copies: List[Copy]
+#     refined_marketing_copies: List[Copy] = []
+#     competitor_analysis: str = ""
+#     tactic_channel_mapping: List[TacticChannelMapEntry] = []
+
+# @CrewBase
+# class MarketingPostsCrew:
+#     agents_config = "config/agents.yaml"
+#     tasks_config = "config/tasks.yaml"
+
+#     @agent
+#     def lead_market_analyst(self) -> Agent:
+#         return Agent(config=self.agents_config["lead_market_analyst"], tools=get_tools(), verbose=True)
+
+#     @agent
+#     def competitor_analyst(self) -> Agent:
+#         return Agent(config=self.agents_config["competitor_analyst"], tools=get_tools(), verbose=True)
+
+#     @agent
+#     def chief_marketing_strategist(self) -> Agent:
+#         return Agent(config=self.agents_config["chief_marketing_strategist"], tools=get_tools(), verbose=True)
+
+#     @agent
+#     def creative_content_creator(self) -> Agent:
+#         return Agent(config=self.agents_config["creative_content_creator"], verbose=True)
+
+#     @agent
+#     def message_refiner(self) -> Agent:
+#         return Agent(config=self.agents_config["message_refiner"], verbose=True)
+
+#     @agent
+#     def chief_creative_director(self) -> Agent:
+#         return Agent(config=self.agents_config["chief_creative_director"], verbose=True)
+
+#     @task
+#     def research_task(self) -> Task:
+#         return Task(config=self.tasks_config["research_task"],
+#                     agent=self.lead_market_analyst(),
+#                     output_json=ResearchOutput)
+
+#     @task
+#     def project_understanding_task(self) -> Task:
+#         return Task(config=self.tasks_config["project_understanding_task"],
+#                     agent=self.chief_marketing_strategist(),
+#                     output_json=ProjectUnderstandingOutput)
+
+#     @task
+#     def marketing_strategy_task(self) -> Task:
+#         return Task(config=self.tasks_config["marketing_strategy_task"],
+#                     agent=self.chief_marketing_strategist(),
+#                     context=[self.research_task(), self.project_understanding_task()],
+#                     output_json=MarketStrategy)
+
+#     @task
+#     def competitor_analysis_task(self) -> Task:
+#         return Task(config=self.tasks_config["competitor_analysis_task"],
+#                     agent=self.competitor_analyst(),
+#                     context=[self.research_task()],
+#                     output_json=ResearchOutput)
+
+#     @task
+#     def campaign_idea_task(self) -> Task:
+#         return Task(config=self.tasks_config["campaign_idea_task"],
+#                     agent=self.creative_content_creator(),
+#                     context=[self.marketing_strategy_task()],
+#                     output_json=CampaignIdeas)
+
+#     @task
+#     def copy_creation_task(self) -> Task:
+#         return Task(config=self.tasks_config["copy_creation_task"],
+#                     agent=self.creative_content_creator(),
+#                     context=[self.campaign_idea_task(), self.marketing_strategy_task()],
+#                     output_json=CopyList)
+
+#     @task
+#     def message_refinement_task(self) -> Task:
+#         return Task(config=self.tasks_config["message_refinement_task"],
+#                     agent=self.message_refiner(),
+#                     context=[self.copy_creation_task(), self.marketing_strategy_task()],
+#                     output_json=CopyList)
+
+#     @task
+#     def consolidate_output_task(self) -> Task:
+#         ctx = [
+#             self.research_task(),
+#             self.project_understanding_task(),
+#             self.marketing_strategy_task(),
+#             self.competitor_analysis_task(),
+#             self.campaign_idea_task(),
+#             self.copy_creation_task(),
+#             self.message_refinement_task()
+#         ]
+#         return Task(config=self.tasks_config["consolidate_output_task"],
+#                     agent=self.chief_creative_director(),
+#                     context=ctx,
+#                     output_json=ConsolidatedOutput,
+#                     human_input=False,
+#                     description="Consolidated final output including refined copies, tactic-channel mapping, and competitor insights.")
+
+#     @crew
+#     def crew(self) -> Crew:
+#         return Crew(agents=self.agents,
+#                     tasks=[
+#                         self.research_task(),
+#                         self.project_understanding_task(),
+#                         self.marketing_strategy_task(),
+#                         self.competitor_analysis_task(),
+#                         self.campaign_idea_task(),
+#                         self.copy_creation_task(),
+#                         self.message_refinement_task(),
+#                         self.consolidate_output_task()
+#                     ],
+#                     process=Process.sequential,
+#                     verbose=True)
+
 
 import logging
-from typing import List
-from pydantic import BaseModel, Field
-
+from typing import List, Dict
+from pydantic import BaseModel
 from crewai import Agent, Crew, Process, Task
 from crewai.project import CrewBase, agent, crew, task
-
 from .tools import get_tools
 
 logging.getLogger("LiteLLM").setLevel(logging.WARNING)
 
-# --------- Pydantic Models --------- #
-
 class MarketStrategy(BaseModel):
     name: str
-    tactics: List[str]
-    channels: List[str]
+    tactic_channel_pairs: List[Dict[str, str]]
     KPIs: List[str]
 
 class CampaignIdea(BaseModel):
@@ -527,6 +844,8 @@ class CampaignIdea(BaseModel):
     description: str
     audience: str
     channel: str
+    tactic_used: str
+    why_channel_fits: str
 
 class CampaignIdeas(BaseModel):
     title: str
@@ -536,23 +855,29 @@ class Copy(BaseModel):
     title: str
     body: str
 
-class CopyList(BaseModel):  # ✅ Wrapper for list of Copy
+class CopyList(BaseModel):
     copies: List[Copy]
 
 class ResearchOutput(BaseModel):
     research_summary: str
 
 class ProjectUnderstandingOutput(BaseModel):
-    project_description: str
+    project_understanding: str
+
+class TacticChannelMapEntry(BaseModel):
+    tactic: str
+    channel: str
+    justification: str
 
 class ConsolidatedOutput(BaseModel):
     research_summary: str
     project_understanding: str
     marketing_strategy: MarketStrategy
     campaign_ideas: CampaignIdeas
-    marketing_copies: List[Copy]  # ✅ Still valid because it's wrapped
-
-# --------- Crew Definition --------- #
+    marketing_copies: List[Copy]
+    refined_marketing_copies: List[Copy] = []
+    competitor_analysis: str = ""
+    tactic_channel_mapping: List[TacticChannelMapEntry] = []
 
 @CrewBase
 class MarketingPostsCrew:
@@ -561,49 +886,35 @@ class MarketingPostsCrew:
 
     @agent
     def lead_market_analyst(self) -> Agent:
-        return Agent(
-            config=self.agents_config["lead_market_analyst"],
-            tools=get_tools(),
-            verbose=True,
-        )
+        return Agent(config=self.agents_config["lead_market_analyst"], tools=get_tools(), verbose=True)
+
+    @agent
+    def competitor_analyst(self) -> Agent:
+        return Agent(config=self.agents_config["competitor_analyst"], tools=get_tools(), verbose=True)
 
     @agent
     def chief_marketing_strategist(self) -> Agent:
-        return Agent(
-            config=self.agents_config["chief_marketing_strategist"],
-            tools=get_tools(),
-            verbose=True,
-        )
+        return Agent(config=self.agents_config["chief_marketing_strategist"], tools=get_tools(), verbose=True)
 
     @agent
     def creative_content_creator(self) -> Agent:
-        return Agent(
-            config=self.agents_config["creative_content_creator"],
-            verbose=True,
-        )
+        return Agent(config=self.agents_config["creative_content_creator"], verbose=True)
+
+    @agent
+    def message_refiner(self) -> Agent:
+        return Agent(config=self.agents_config["message_refiner"], verbose=True)
 
     @agent
     def chief_creative_director(self) -> Agent:
-        return Agent(
-            config=self.agents_config["chief_creative_director"],
-            verbose=True,
-        )
+        return Agent(config=self.agents_config["chief_creative_director"], verbose=True)
 
     @task
     def research_task(self) -> Task:
-        return Task(
-            config=self.tasks_config["research_task"],
-            agent=self.lead_market_analyst(),
-            output_json=ResearchOutput,
-        )
+        return Task(config=self.tasks_config["research_task"], agent=self.lead_market_analyst(), output_json=ResearchOutput)
 
     @task
     def project_understanding_task(self) -> Task:
-        return Task(
-            config=self.tasks_config["project_understanding_task"],
-            agent=self.chief_marketing_strategist(),
-            output_json=ProjectUnderstandingOutput,
-        )
+        return Task(config=self.tasks_config["project_understanding_task"], agent=self.chief_marketing_strategist(), output_json=ProjectUnderstandingOutput)
 
     @task
     def marketing_strategy_task(self) -> Task:
@@ -611,7 +922,16 @@ class MarketingPostsCrew:
             config=self.tasks_config["marketing_strategy_task"],
             agent=self.chief_marketing_strategist(),
             context=[self.research_task(), self.project_understanding_task()],
-            output_json=MarketStrategy,
+            output_json=MarketStrategy
+        )
+
+    @task
+    def competitor_analysis_task(self) -> Task:
+        return Task(
+            config=self.tasks_config["competitor_analysis_task"],
+            agent=self.competitor_analyst(),
+            context=[self.research_task()],
+            output_json=ResearchOutput
         )
 
     @task
@@ -620,7 +940,7 @@ class MarketingPostsCrew:
             config=self.tasks_config["campaign_idea_task"],
             agent=self.creative_content_creator(),
             context=[self.marketing_strategy_task()],
-            output_json=CampaignIdeas,
+            output_json=CampaignIdeas
         )
 
     @task
@@ -629,31 +949,35 @@ class MarketingPostsCrew:
             config=self.tasks_config["copy_creation_task"],
             agent=self.creative_content_creator(),
             context=[self.campaign_idea_task(), self.marketing_strategy_task()],
-            output_json=CopyList,  # ✅ Fix: must be BaseModel
+            output_json=CopyList
+        )
+
+    @task
+    def message_refinement_task(self) -> Task:
+        return Task(
+            config=self.tasks_config["message_refinement_task"],
+            agent=self.message_refiner(),
+            context=[self.copy_creation_task(), self.marketing_strategy_task()],
+            output_json=CopyList
         )
 
     @task
     def consolidate_output_task(self) -> Task:
+        ctx = [
+            self.research_task(),
+            self.project_understanding_task(),
+            self.marketing_strategy_task(),
+            self.competitor_analysis_task(),
+            self.campaign_idea_task(),
+            self.copy_creation_task(),
+            self.message_refinement_task()
+        ]
         return Task(
-            description=(
-                "Review all generated content and consolidate it into a single structured JSON with keys: "
-                "'research_summary', 'project_understanding', 'marketing_strategy', "
-                "'campaign_ideas', and 'marketing_copies'."
-            ),
+            config=self.tasks_config["consolidate_output_task"],
             agent=self.chief_creative_director(),
-            context=[
-                self.research_task(),
-                self.project_understanding_task(),
-                self.marketing_strategy_task(),
-                self.campaign_idea_task(),
-                self.copy_creation_task(),
-            ],
+            context=ctx,
             output_json=ConsolidatedOutput,
-            human_input=False,
-            expected_output=(
-                "A JSON with keys: 'research_summary', 'project_understanding', "
-                "'marketing_strategy', 'campaign_ideas', and 'marketing_copies'."
-            )
+            human_input=False
         )
 
     @crew
@@ -664,10 +988,187 @@ class MarketingPostsCrew:
                 self.research_task(),
                 self.project_understanding_task(),
                 self.marketing_strategy_task(),
+                self.competitor_analysis_task(),
                 self.campaign_idea_task(),
                 self.copy_creation_task(),
-                self.consolidate_output_task(),
+                self.message_refinement_task(),
+                self.consolidate_output_task()
             ],
             process=Process.sequential,
-            verbose=True,
+            verbose=True
         )
+
+
+
+
+
+
+#  Old Code 
+# import logging
+# from typing import List
+# from pydantic import BaseModel, Field
+
+# from crewai import Agent, Crew, Process, Task
+# from crewai.project import CrewBase, agent, crew, task
+
+# from .tools import get_tools
+
+# logging.getLogger("LiteLLM").setLevel(logging.WARNING)
+
+# # --------- Pydantic Models --------- #
+
+# class MarketStrategy(BaseModel):
+#     name: str
+#     tactics: List[str]
+#     channels: List[str]
+#     KPIs: List[str]
+
+# class CampaignIdea(BaseModel):
+#     name: str
+#     description: str
+#     audience: str
+#     channel: str
+
+# class CampaignIdeas(BaseModel):
+#     title: str
+#     ideas: List[CampaignIdea]
+
+# class Copy(BaseModel):
+#     title: str
+#     body: str
+
+# class CopyList(BaseModel):  # ✅ Wrapper for list of Copy
+#     copies: List[Copy]
+
+# class ResearchOutput(BaseModel):
+#     research_summary: str
+
+# class ProjectUnderstandingOutput(BaseModel):
+#     project_description: str
+
+# class ConsolidatedOutput(BaseModel):
+#     research_summary: str
+#     project_understanding: str
+#     marketing_strategy: MarketStrategy
+#     campaign_ideas: CampaignIdeas
+#     marketing_copies: List[Copy]  # ✅ Still valid because it's wrapped
+
+# # --------- Crew Definition --------- #
+
+# @CrewBase
+# class MarketingPostsCrew:
+#     agents_config = "config/agents.yaml"
+#     tasks_config = "config/tasks.yaml"
+
+#     @agent
+#     def lead_market_analyst(self) -> Agent:
+#         return Agent(
+#             config=self.agents_config["lead_market_analyst"],
+#             tools=get_tools(),
+#             verbose=True,
+#         )
+
+#     @agent
+#     def chief_marketing_strategist(self) -> Agent:
+#         return Agent(
+#             config=self.agents_config["chief_marketing_strategist"],
+#             tools=get_tools(),
+#             verbose=True,
+#         )
+
+#     @agent
+#     def creative_content_creator(self) -> Agent:
+#         return Agent(
+#             config=self.agents_config["creative_content_creator"],
+#             verbose=True,
+#         )
+
+#     @agent
+#     def chief_creative_director(self) -> Agent:
+#         return Agent(
+#             config=self.agents_config["chief_creative_director"],
+#             verbose=True,
+#         )
+
+#     @task
+#     def research_task(self) -> Task:
+#         return Task(
+#             config=self.tasks_config["research_task"],
+#             agent=self.lead_market_analyst(),
+#             output_json=ResearchOutput,
+#         )
+
+#     @task
+#     def project_understanding_task(self) -> Task:
+#         return Task(
+#             config=self.tasks_config["project_understanding_task"],
+#             agent=self.chief_marketing_strategist(),
+#             output_json=ProjectUnderstandingOutput,
+#         )
+
+#     @task
+#     def marketing_strategy_task(self) -> Task:
+#         return Task(
+#             config=self.tasks_config["marketing_strategy_task"],
+#             agent=self.chief_marketing_strategist(),
+#             context=[self.research_task(), self.project_understanding_task()],
+#             output_json=MarketStrategy,
+#         )
+
+#     @task
+#     def campaign_idea_task(self) -> Task:
+#         return Task(
+#             config=self.tasks_config["campaign_idea_task"],
+#             agent=self.creative_content_creator(),
+#             context=[self.marketing_strategy_task()],
+#             output_json=CampaignIdeas,
+#         )
+
+#     @task
+#     def copy_creation_task(self) -> Task:
+#         return Task(
+#             config=self.tasks_config["copy_creation_task"],
+#             agent=self.creative_content_creator(),
+#             context=[self.campaign_idea_task(), self.marketing_strategy_task()],
+#             output_json=CopyList,  # ✅ Fix: must be BaseModel
+#         )
+
+#     @task
+#     def consolidate_output_task(self) -> Task:
+#         return Task(
+#             description=(
+#                 "Review all generated content and consolidate it into a single structured JSON with keys: "
+#                 "'research_summary', 'project_understanding', 'marketing_strategy', "
+#                 "'campaign_ideas', and 'marketing_copies'."
+#             ),
+#             agent=self.chief_creative_director(),
+#             context=[
+#                 self.research_task(),
+#                 self.project_understanding_task(),
+#                 self.marketing_strategy_task(),
+#                 self.campaign_idea_task(),
+#                 self.copy_creation_task(),
+#             ],
+#             output_json=ConsolidatedOutput,
+#             human_input=False,
+#             expected_output=(
+#                 "A JSON with keys: 'research_summary', 'project_understanding', "
+#                 "'marketing_strategy', 'campaign_ideas', and 'marketing_copies'."
+#             )
+#         )
+
+#     @crew
+#     def crew(self) -> Crew:
+#         return Crew(
+#             agents=self.agents,
+#             tasks=[
+#                 self.research_task(),
+#                 self.project_understanding_task(),
+#                 self.marketing_strategy_task(),
+#                 self.campaign_idea_task(),
+#                 self.copy_creation_task(),
+#                 self.consolidate_output_task(),
+#             ],
+#             process=Process.sequential,
+#             verbose=True,
+#         )
